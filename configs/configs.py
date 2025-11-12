@@ -12,10 +12,14 @@ class RunConfig:
     random_seed: int = 42
     test_size: float = 0.2
     val_size: float = 0.2 
+    num_folds: int = 5
+    evaluate_model: bool = True
 
 
 @dataclass(init=False, frozen=True)
 class ModelConfig:
     model_name: str = "alpha"
+    n_estimators: int = 100
     max_depth: int = 100
     class_weight: str = "balanced"
+    random_state: int = 42
