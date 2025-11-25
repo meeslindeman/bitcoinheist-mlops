@@ -8,6 +8,10 @@ def data_preprocessing(data: DataFrame) -> DataFrame:
     if "address" in data.columns:
         data = data.drop("address")
 
+    # note: dataset has no nans but fill nulls in numeric columns with 0.0 for safety
+    numeric_cols = ["year", "day", "length", "weight", "count", "looped", "neighbors", "income"]
+    data = data.fillna({col: 0.0 for col in numeric_cols})
+
     ransom_df = data.filter(F.col("label") != "white")
     white_df = data.filter(F.col("label") == "white")
 

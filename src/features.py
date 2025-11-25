@@ -6,8 +6,11 @@ from pyspark.sql import functions as F
 
 def get_log_transformed_features(data: DataFrame, features: List[str]) -> DataFrame:
     for feature in features:
-        log_feature = f"log_{feature}"
-        data = data.withColumn(log_feature, F.log1p(F.col(feature)))
+        col = F.col(feature)
+        # note: enforce non-negative values for log
+        nonneg_col = F.when(col.isNull() | (col < 0), F.lit(0.0)).otherwise(col)
+        data = data.withColumn(feature, nonneg_col)
+        data = data.withColumn(f"log_{feature}", F.log1p(feature))
     return data
 
 
@@ -34,6 +37,9 @@ def get_ratio_features(data: DataFrame) -> DataFrame:
 
 
 def get_temporal_features(data: DataFrame) -> DataFrame:
+    # note: fill missing year/day for robustness
+    data = data.fillna({"year": 2009, "day": 0})
+    
     # note: (year - 2009) * 365 + day
     data = data.withColumn(
         "days_since_2009",
@@ -51,8 +57,6 @@ def get_temporal_features(data: DataFrame) -> DataFrame:
 
 def _get_z_score(data: DataFrame, value_col: str, group_by_cols: List[str] | None = None) -> DataFrame:
     group_by_cols = group_by_cols or []
-
-    data = data.fillna({value_col: 0.0})
 
     stats = (data.groupBy(group_by_cols) if group_by_cols else data.groupBy()).agg(
         F.mean(value_col).alias("mean"),

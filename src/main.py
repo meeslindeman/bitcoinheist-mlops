@@ -23,7 +23,7 @@ def model_training(data) -> None:
 
 def main():
     spark = SparkSession.builder.appName("RansomwareDetection").getOrCreate()
-    data = (spark.read.csv(PathsConfig.raw_data, header=True, inferSchema=True))
+    data = (spark.read.csv(PathsConfig.raw_csv_path, header=True, inferSchema=True))
 
     data = data_preprocessing(data)
     data = get_features(data)
