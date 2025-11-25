@@ -69,7 +69,7 @@ class Model:
         self._test_report = report
         self._test_roc_auc = roc_auc
 
-    def get_cv_scores(self, data: pd.DataFrame) -> dict:
+    def get_cv_scores(self) -> dict:
         if self._cv_scores is None:
             raise RuntimeError("Model has not been trained yet.")
         return self._cv_scores

@@ -29,12 +29,13 @@ def main():
 
     # note: train model
     features_pd = features_data.toPandas()
+    features_pd = features_pd.sample(frac=0.2, random_state=42) # NOTE: reduce data size for faster training during development, remove later
     model = Model()
 
-    print("\nCross-validation scores:")
-    print(model.get_cv_scores(features_pd))
-
     model.train_model(features_pd)
+
+    print("\nCross-validation scores:")
+    print(model.get_cv_scores())
 
     if getattr(RunConfig, "evaluate_model", False):
         print("\nEvaluating model on test set:")

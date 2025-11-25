@@ -15,3 +15,10 @@ https://github.com/toji-ut/BitcoinHeistRansomwareAnalytics
 | **Length** | Longest chain length from a “starter” transaction to the address | Indicates how deep in the transaction graph the address sits (useful for detecting coin-mixing). |
 | **Count** | Number of distinct starter transactions connected through chains | Measures how many separate flows converge to that address. |
 | **Loop** | Number of starter transactions connected through *multiple* directed paths | Identifies obfuscation or coin-mixing loops. |
+
+
+## Docker
+
+docker build -f infra/build/Dockerfile -t bitcoinheist-app:latest .
+docker compose -f ./infra/docker-compose.yaml up
+docker compose -f infra/docker-compose.yaml up --force-recreate --remove-orphans

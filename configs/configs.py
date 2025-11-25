@@ -15,7 +15,7 @@ class RunConfig:
     random_seed: int = 42
     test_size: float = 0.2
     val_size: float = 0.2 
-    num_folds: int = 5
+    num_folds: int = 3
     evaluate_model: bool = True
     log_to_mlflow: bool = False
     mlflow_tracking_uri: str = "http://mlflow:8080"
@@ -25,8 +25,8 @@ class RunConfig:
 @dataclass(init=False, frozen=True)
 class ModelConfig:
     model_name: str = "alpha"
-    n_estimators: int = 100
-    max_depth: int = 100
+    n_estimators: int = 20
+    max_depth: int = 20
     random_state: int = 42
 
 
@@ -34,10 +34,10 @@ class ModelConfig:
 class DatabaseConfig:
     host: str = os.getenv("MYSQL_HOST", "localhost")
     port: int = int(os.getenv("MYSQL_PORT", 3306))
-    database: str = "bitcoin_db"
 
-    user: str = "root"
-    password: str = "password"
+    user: str = "bitcoin_user"
+    password: str = "bitcoin_password"
+    database: str = "bitcoin_db"
 
     raw_table: str = "bitcoin_raw"
     preprocessed_table: str = "bitcoin_preprocessed"
