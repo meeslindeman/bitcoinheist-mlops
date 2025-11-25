@@ -52,6 +52,8 @@ def get_temporal_features(data: DataFrame) -> DataFrame:
 def _get_z_score(data: DataFrame, value_col: str, group_by_cols: List[str] | None = None) -> DataFrame:
     group_by_cols = group_by_cols or []
 
+    data = data.fillna({value_col: 0.0})
+
     stats = (data.groupBy(group_by_cols) if group_by_cols else data.groupBy()).agg(
         F.mean(value_col).alias("mean"),
         F.stddev(value_col).alias("std"),
@@ -68,11 +70,12 @@ def _get_z_score(data: DataFrame, value_col: str, group_by_cols: List[str] | Non
     else:
         z_col_name = f"z_{value_col}"
 
+    z_score_raw = (F.col(value_col) - F.col("mean")) / F.col("std")
+
     data = data.withColumn(
         z_col_name,
-        F.when(F.col("std").isNull() | (F.col("std") == 0), F.lit(0.0)).otherwise(
-            (F.col(value_col) - F.col("mean")) / F.col("std")
-        ),
+        F.when(F.col("std").isNull() | (F.col("std") == 0), F.lit(0.0))
+        .otherwise(z_score_raw)
     )
 
     data = data.drop("mean", "std")

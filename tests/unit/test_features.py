@@ -38,6 +38,27 @@ def test_get_log_transformed_features(spark_fixture):
     assert row0["log_looped"] == pytest.approx(math.log1p(1.0))
 
 
+def test_get_log_transformed_features_boundaries(spark_fixture):
+    data = spark_fixture.createDataFrame(
+        [
+            {"income": 0.0, "weight": 0.0, "count": 0.0, "looped": 0.0},
+            {"income": 0.5, "weight": 10.0, "count": 1.0, "looped": 2.0},
+            {"income": -0.5, "weight": 1.0, "count": 0.0, "looped": 0.0},
+        ]
+    )
+
+    out = get_log_transformed_features(
+        data,
+        ["income", "weight", "count", "looped"],
+    )
+    rows = out.collect()
+
+    # note: 0 -> log1p(0) = 0
+    assert rows[0]["log_income"] == pytest.approx(0.0)
+    assert rows[1]["log_income"] == pytest.approx(math.log1p(0.5))
+    assert rows[2]["log_income"] == pytest.approx(math.log1p(-0.5))
+
+
 def test_get_ratio_features(spark_fixture):
     data = spark_fixture.createDataFrame(
         [
@@ -81,6 +102,42 @@ def test_get_ratio_features(spark_fixture):
     )
 
 
+def test_get_ratio_features_boundaries(spark_fixture):
+    data = spark_fixture.createDataFrame(
+        [
+            {
+                "count": 0.0,
+                "neighbors": 0.0,
+                "looped": 0.0,
+                "weight": 0.0,
+                "income": 0.0,
+            },
+            {
+                "count": 1e6,
+                "neighbors": 1e6,
+                "looped": 1e6,
+                "weight": 1e6,
+                "income": 1e6,
+            },
+        ]
+    )
+
+    out = get_ratio_features(data)
+    rows = out.collect()
+
+    # note: row 0: denominators are +1
+    r0 = rows[0]
+    assert r0["activity_index"] == pytest.approx(0.0)  # (0+0)/(0+1)
+    assert r0["weight_to_count"] == pytest.approx(0.0)  # 0/(0+1)
+    assert r0["income_per_neighbor"] == pytest.approx(0.0)  # 0/(0+1)
+
+    # note: row 1: sanity check non-zero finite outputs
+    r1 = rows[1]
+    assert math.isfinite(r1["activity_index"])
+    assert math.isfinite(r1["weight_to_count"])
+    assert math.isfinite(r1["income_per_neighbor"])
+
+
 def test_get_temporal_features(spark_fixture):
     data = spark_fixture.createDataFrame(
         [
@@ -98,6 +155,26 @@ def test_get_temporal_features(spark_fixture):
     assert row0["days_since_2009"] == 1
     # note: (2010 - 2009) * 365 + 365 = 730
     assert row1["days_since_2009"] == 730
+
+
+def test_get_temporal_features_extended(spark_fixture):
+    data = spark_fixture.createDataFrame(
+        [
+            {"year": 2010, "day": 0},
+            {"year": 2010, "day": 3650},  # 10 years worth of days
+        ]
+    )
+
+    out = get_temporal_features(data)
+    rows = out.collect()
+
+    for r in rows:
+        assert math.isfinite(r["sin_day"])
+        assert math.isfinite(r["cos_day"])
+
+    # note: days_since_2009 still linear in year/day
+    assert rows[0]["days_since_2009"] == (2010 - 2009) * 365 + 0
+    assert rows[1]["days_since_2009"] == (2010 - 2009) * 365 + 3650
 
 
 def test_get_z_score_global(spark_fixture):
@@ -147,6 +224,25 @@ def test_get_z_score_grouped(spark_fixture):
 
     # note: year 2011: incomes [10,10] -> std=0 -> z should be 0.0 by design
     assert rows[(2011, 10.0)] == pytest.approx(0.0)
+
+
+def test_get_z_score_with_nulls(spark_fixture):
+    data = spark_fixture.createDataFrame(
+        [
+            {"income": 10.0},
+            {"income": None},
+            {"income": 20.0},
+        ]
+    )
+
+    out = _get_z_score(data, value_col="income")
+    rows = {r["income"]: r["z_income"] for r in out.collect()}
+
+    assert set(rows.keys()) == {10.0, 20.0, 0.0}
+
+    # note: all z-scores should be finite
+    for z in rows.values():
+        assert math.isfinite(z)
 
 
 def test_get_features(spark_fixture):
