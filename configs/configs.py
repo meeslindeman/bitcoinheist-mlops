@@ -3,10 +3,9 @@ import os
 
 @dataclass(init=False, frozen=True)
 class PathsConfig:
-    raw_data_path: str = "data/BitcoinHeistData.csv" # Raw upstream data.
+    raw_csv_path: str = "data/BitcoinHeistData.csv" 
     preprocessing_data_path: str = "data/intermediate/preprocessing/"
     features_data_path: str = "data/intermediate/features/"
-    raw_csv_path: str = "data/BitcoinHeistData.csv" 
 
     model_path: str = "models/"  # Model store
 
@@ -34,10 +33,12 @@ class ModelConfig:
 @dataclass(init=False, frozen=True)
 class DatabaseConfig:
     host: str = os.getenv("MYSQL_HOST", "localhost")
-    port: int = 3306
-    database: str = "transactions_db"
-    user: str = "user"
+    port: int = int(os.getenv("MYSQL_PORT", 3306))
+    database: str = "bitcoin_db"
+
+    user: str = "root"
     password: str = "password"
-    raw_table: str = "raw_transactions"
-    preprocessing_table: str = "preprocessed_data"
-    features_table: str = "features_data"
+
+    raw_table: str = "bitcoin_raw"
+    preprocessed_table: str = "bitcoin_preprocessed"
+    features_table: str = "bitcoin_features"
