@@ -14,6 +14,7 @@ class RunConfig:
     val_size: float = 0.2 
     num_folds: int = 5
     evaluate_model: bool = True
+    log_to_mlflow: bool = False
 
 
 @dataclass(init=False, frozen=True)

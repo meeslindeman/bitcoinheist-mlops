@@ -7,14 +7,19 @@ from src.model_training import Model
 
 def model_training(data) -> None:
     model = Model()
+    model.train_model(data)
+
     print("\nCross-validation scores:")
     print(model.get_cv_scores(data))
-    model.train_model(data)
 
     if RunConfig.evaluate_model:
         print("\nEvaluating model on test set:")
         model.evaluate_model(data)
+
     model.save_model()
+
+    if RunConfig.log_to_mlflow:
+        model.log_modelto_mlflow()
 
 def main():
     spark = SparkSession.builder.appName("RansomwareDetection").getOrCreate()
