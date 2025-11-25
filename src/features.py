@@ -14,7 +14,7 @@ def get_log_transformed_features(data: DataFrame, features: List[str]) -> DataFr
 def get_ratio_features(data: DataFrame) -> DataFrame:
     # note: (count + neighbors) / (looped + 1)
     data = data.withColumn(
-        "activity index",
+        "activity_index",
         (F.col("count") + F.col("neighbors")) / (F.col("looped") + F.lit(1))
     )
 

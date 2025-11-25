@@ -4,10 +4,17 @@ import pandas as pd
 import pytest
 from pyspark.testing.utils import assertDataFrameEqual
 
-from src.features import *
+from src.features import (
+    get_log_transformed_features,
+    get_ratio_features,
+    get_temporal_features,
+    _get_z_score,
+    get_features,
+)
 
-def test_get_log_transformed_features(spark_session):
-    data = spark_session.createDataFrame(
+
+def test_get_log_transformed_features(spark_fixture):
+    data = spark_fixture.createDataFrame(
         [
             {"income": 0.0, "weight": 10.0, "count": 2.0, "looped": 1.0},
             {"income": 100.0, "weight": 5.0, "count": 0.0, "looped": 0.0},
@@ -31,8 +38,8 @@ def test_get_log_transformed_features(spark_session):
     assert row0["log_looped"] == pytest.approx(math.log1p(1.0))
 
 
-def test_get_ratio_features(spark_session):
-    data = spark_session.createDataFrame(
+def test_get_ratio_features(spark_fixture):
+    data = spark_fixture.createDataFrame(
         [
             {"count": 0.0, "neighbors": 0.0, "looped": 0.0, "weight": 10.0, "income": 100.0},
             {"count": 1.0, "neighbors": 1.0, "looped": 1.0, "weight": 20.0, "income": 200.0},
@@ -41,7 +48,7 @@ def test_get_ratio_features(spark_session):
 
     out = get_ratio_features(data)
 
-    expected = spark_session.createDataFrame(
+    expected = spark_fixture.createDataFrame(
         [
             {
                 "count": 0.0,
@@ -74,8 +81,8 @@ def test_get_ratio_features(spark_session):
     )
 
 
-def test_get_temporal_features(spark_session):
-    data = spark_session.createDataFrame(
+def test_get_temporal_features(spark_fixture):
+    data = spark_fixture.createDataFrame(
         [
             {"year": 2009, "day": 1},
             {"year": 2010, "day": 365},
@@ -93,8 +100,57 @@ def test_get_temporal_features(spark_session):
     assert row1["days_since_2009"] == 730
 
 
-def test_get_features(spark_session):
-    data = spark_session.createDataFrame(
+def test_get_z_score_global(spark_fixture):
+    data = spark_fixture.createDataFrame(
+        [
+            {"income": 1.0},
+            {"income": 2.0},
+            {"income": 3.0},
+        ]
+    )
+
+    out = _get_z_score(data, value_col="income")
+
+    # note: mean = 2, std = 1, so z = income - 2
+    expected = spark_fixture.createDataFrame(
+        [
+            {"income": 1.0, "z_income": -1.0},
+            {"income": 2.0, "z_income": 0.0},
+            {"income": 3.0, "z_income": 1.0},
+        ]
+    )
+
+    assertDataFrameEqual(
+        out.select("income", "z_income"),
+        expected,
+        ignoreColumnOrder=True,
+    )
+
+
+def test_get_z_score_grouped(spark_fixture):
+    data = spark_fixture.createDataFrame(
+        [
+            {"income": 1.0, "year": 2010},
+            {"income": 3.0, "year": 2010},
+            {"income": 10.0, "year": 2011},
+            {"income": 10.0, "year": 2011},
+        ]
+    )
+
+    out = _get_z_score(data, value_col="income", group_by_cols=["year"])
+
+    rows = { (r["year"], r["income"]): r["z_income_by_year"] for r in out.collect() }
+
+    # note: year 2010: incomes [1,3] -> mean=2, std= sqrt(((1-2)^2+(3-2)^2)/(n-1)) = sqrt(2)
+    assert rows[(2010, 1.0)] == pytest.approx((1.0 - 2.0) / (2.0 ** 0.5))
+    assert rows[(2010, 3.0)] == pytest.approx((3.0 - 2.0) / (2.0 ** 0.5))
+
+    # note: year 2011: incomes [10,10] -> std=0 -> z should be 0.0 by design
+    assert rows[(2011, 10.0)] == pytest.approx(0.0)
+
+
+def test_get_features(spark_fixture):
+    data = spark_fixture.createDataFrame(
         [
             {
                 "year": 2010,
@@ -140,6 +196,8 @@ def test_get_features(spark_session):
         "days_since_2009",
         "sin_day",
         "cos_day",
+        "z_income",
+        "z_income_by_year"
     }
 
     assert expected_cols.issubset(set(out.columns))
