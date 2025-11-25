@@ -31,7 +31,6 @@ def data_preprocessing(data: DataFrame) -> DataFrame:
     # note: assert balanced classes
     white_balanced = data.filter(F.col("label") == "white").count()
     ransom_balanced = data.filter(F.col("label") != "white").count()
-    print(f"Balanced class counts - white: {white_balanced}, ransomware: {ransom_balanced}")
     assert white_balanced == ransom_balanced, "Classes are not balanced after preprocessing."
 
     # note: convert label to binary
