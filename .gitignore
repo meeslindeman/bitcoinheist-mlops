@@ -208,3 +208,6 @@ __marimo__/
 # Model files
 *.pkl
 *.pickle
+
+# PySpark 
+artifacts/

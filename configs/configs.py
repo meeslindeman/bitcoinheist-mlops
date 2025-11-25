@@ -21,5 +21,4 @@ class ModelConfig:
     model_name: str = "alpha"
     n_estimators: int = 100
     max_depth: int = 100
-    class_weight: str = "balanced"
     random_state: int = 42
