@@ -4,6 +4,7 @@ import numpy as np
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 
+
 def get_log_transformed_features(data: DataFrame, features: List[str]) -> DataFrame:
     for feature in features:
         col = F.col(feature)

@@ -3,6 +3,7 @@ from pyspark.sql import functions as F
 
 from configs.configs import RunConfig
 
+
 def data_preprocessing(data: DataFrame) -> DataFrame:
     # note: drop 'address' column as it is not useful for modeling
     if "address" in data.columns:

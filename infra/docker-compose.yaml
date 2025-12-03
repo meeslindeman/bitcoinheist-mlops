@@ -1,47 +1,89 @@
 services:
-  mysql:
-    image: mysql:8.0
-    container_name:  bitcoinheist-mysql
-    restart: always
-    environment:
-      MYSQL_ROOT_PASSWORD: rootpassword
-      MYSQL_DATABASE: bitcoin_db
-      MYSQL_USER: bitcoin_user
-      MYSQL_PASSWORD: bitcoin_password
-    ports:
-      - "3306:3306"
-    volumes:
-      - mysql-data:/var/lib/mysql
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-prootpassword"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-      start_period: 30s
-  
-  # note: initialize database with csv
-  init-db:
+  # 1) Initialize Parquet data from CSV
+  init-parquet:
     image: bitcoinheist-app:latest
-    command: python scripts/csv_to_mysql.py
-    environment:
-      MYSQL_HOST: mysql
+    command: python scripts/csv_to_parquet.py
+    restart: "no"
+    volumes:
+      - heist-data:/bitcoinheist-app/data
+
+  # 2) Offline training pipeline (can be triggered via compose or Airflow)
+  training:
+    image: bitcoinheist-app:latest
+    command: python src/main_training.py --preprocess --feat-eng --training
     depends_on:
-      mysql:
+      init-parquet:
+        condition: service_completed_successfully
+      mlflow:
         condition: service_healthy
     restart: "no"
-  
-  # note: main training pipeline
+    volumes:
+      - heist-data:/bitcoinheist-app/data
+      - heist-models:/bitcoinheist-app/models
+      - heist-telemetry:/bitcoinheist-app/telemetry
+
+  # 3) Online API service
   app:
     image: bitcoinheist-app:latest
-    command: python src/main.py
-    environment:
-      MYSQL_HOST: mysql
+    command: flask --app src.main_api run --host 0.0.0.0 --port 5001
     depends_on:
-      mysql:
+      mlflow:
         condition: service_healthy
-      init-db:
+      training:
         condition: service_completed_successfully
-    restart: "no"
+    ports:
+      - "5001:5001"
+    restart: "always"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5001/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    volumes:
+      - heist-data:/bitcoinheist-app/data
+      - heist-models:/bitcoinheist-app/models
+
+  # 4) MLflow tracking server
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v3.3.0rc0
+    command:
+      mlflow server
+      --host 0.0.0.0
+      --port 8080
+      --backend-store-uri sqlite:///mlflow.db
+      --default-artifact-root /mlflow/artifacts
+    volumes:
+      - mlflow-data:/mlflow
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: >
+        apt-get update -y &&
+        apt-get install -y curl &&
+        curl --fail http://localhost:8080 || exit 1
+      interval: 5s
+      retries: 3
+
+  # 5) Airflow for batch pipeline orchestration
+  airflow:
+    image: apache/airflow:3.1.0-python3.10
+    command: airflow standalone
+    environment:
+      - _AIRFLOW_DB_MIGRATE=true
+      - AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_ALL_ADMINS=true
+    ports:
+      - "4242:8080"   # Airflow UI
+    volumes:
+      - ./airflow/dags/:/opt/airflow/dags
+      - /var/run/docker.sock:/var/run/docker.sock
+    healthcheck:
+      test: wget http://localhost:8080/api/v2/monitor/health -o /dev/null || exit 1
+      retries: 3
+      interval: 5s
 
 volumes:
-  mysql-data:
+  heist-data:
+  heist-models:
+  heist-telemetry:
+  mlflow-data:
