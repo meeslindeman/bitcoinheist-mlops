@@ -62,5 +62,4 @@ docker compose -f infra/docker-compose.yaml build --no-cache
 ## Notes
 
 - The pipeline expects the BitcoinHeist CSV at `data/BitcoinHeistData.csv`.
-- All intermediate data products are written to MySQL tables defined in `DatabaseConfig`.
 - PySpark runs inside the application container using OpenJDK 17.

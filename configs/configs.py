@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 from dataclasses import dataclass
 
@@ -13,7 +12,7 @@ class PathsConfig:
     features_data_path: str = str(PROJECT_ROOT / "data" / "parquet" / "features")
 
     model_path: str = str(PROJECT_ROOT / "models")  
-    model_file_path: str = str(Path(model_path) / "BitcoinHeist.pkl")  # optional, not required
+    model_file_path: str = str(Path(model_path) / "BitcoinHeist.pkl") 
     feature_columns_path: str = str(Path(model_path) / "feature_columns.json")
 
     telemetry_training_data_path: str = str(PROJECT_ROOT / "telemetry" / "training_summary.json")

@@ -1,36 +1,35 @@
 services:
-  # 1) Initialize Parquet data from CSV
-  init-parquet:
-    image: bitcoinheist-app:latest
-    command: python scripts/csv_to_parquet.py
-    restart: "no"
-    volumes:
-      - heist-data:/bitcoinheist-app/data
+  # init-parquet:
+  #   image: bitcoinheist-app:latest
+  #   command: python scripts/csv_to_parquet.py
+  #   restart: "no"
+  #   volumes:
+  #     - bitcoin-heist-data:/bitcoinheist-app/data
 
-  # 2) Offline training pipeline (can be triggered via compose or Airflow)
-  training:
-    image: bitcoinheist-app:latest
-    command: python src/main_training.py --preprocess --feat-eng --training
-    depends_on:
-      init-parquet:
-        condition: service_completed_successfully
-      mlflow:
-        condition: service_healthy
-    restart: "no"
-    volumes:
-      - heist-data:/bitcoinheist-app/data
-      - heist-models:/bitcoinheist-app/models
-      - heist-telemetry:/bitcoinheist-app/telemetry
+  # training:
+  #   image: bitcoinheist-app:latest
+  #   command: python src/main_training.py --preprocess --feat-eng --training
+  #   depends_on:
+  #     init-parquet:
+  #       condition: service_completed_successfully
+  #     mlflow:
+  #       condition: service_healthy
+  #   restart: "no"
+  #   volumes:
+  #     - bitcoin-heist-data:/bitcoinheist-app/data
+  #     - bitcoin-heist-models:/bitcoinheist-app/models
+  #     - bitcoin-heist-telemetry:/bitcoinheist-app/telemetry
 
-  # 3) Online API service
   app:
     image: bitcoinheist-app:latest
     command: flask --app src.main_api run --host 0.0.0.0 --port 5001
     depends_on:
       mlflow:
         condition: service_healthy
-      training:
-        condition: service_completed_successfully
+      # prometheus:
+      #   condition: service_healthy
+      # telemetry_job:
+      #   condition: service_started
     ports:
       - "5001:5001"
     restart: "always"
@@ -41,20 +40,12 @@ services:
       retries: 5
       start_period: 30s
     volumes:
-      - heist-data:/bitcoinheist-app/data
-      - heist-models:/bitcoinheist-app/models
+      - bitcoin-heist-data:/bitcoinheist-app/data
+      - bitcoin-heist-models:/bitcoinheist-app/models
 
-  # 4) MLflow tracking server
   mlflow:
     image: ghcr.io/mlflow/mlflow:v3.3.0rc0
-    command:
-      mlflow server
-      --host 0.0.0.0
-      --port 8080
-      --backend-store-uri sqlite:///mlflow.db
-      --default-artifact-root /mlflow/artifacts
-    volumes:
-      - mlflow-data:/mlflow
+    command: mlflow server --host 0.0.0.0 --port 8080
     ports:
       - "8080:8080"
     healthcheck:
@@ -64,8 +55,9 @@ services:
         curl --fail http://localhost:8080 || exit 1
       interval: 5s
       retries: 3
+    volumes:
+      - mlflow-data:/mlflow
 
-  # 5) Airflow for batch pipeline orchestration
   airflow:
     image: apache/airflow:3.1.0-python3.10
     command: airflow standalone
@@ -73,7 +65,7 @@ services:
       - _AIRFLOW_DB_MIGRATE=true
       - AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_ALL_ADMINS=true
     ports:
-      - "4242:8080"   # Airflow UI
+      - "4242:8080"
     volumes:
       - ./airflow/dags/:/opt/airflow/dags
       - /var/run/docker.sock:/var/run/docker.sock
@@ -83,7 +75,11 @@ services:
       interval: 5s
 
 volumes:
-  heist-data:
-  heist-models:
-  heist-telemetry:
+  bitcoin-heist-data:
+  bitcoin-heist-models:
+  bitcoin-heist-telemetry:
   mlflow-data:
+
+networks:
+  default:
+    name: infra_default

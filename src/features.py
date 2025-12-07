@@ -1,9 +1,11 @@
 from typing import List
 import numpy as np
+import logging
 
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 
+logger = logging.getLogger(__name__)
 
 def get_log_transformed_features(data: DataFrame, features: List[str]) -> DataFrame:
     for feature in features:
@@ -104,5 +106,5 @@ def get_features(data: DataFrame) -> DataFrame:
     drop_cols = ["year", "income", "length"]
     data = data.drop(*drop_cols)
 
-    print(f"Final feature set columns: {data.columns}")
+    logger.info("Final feature set columns: %s", data.columns)
     return data

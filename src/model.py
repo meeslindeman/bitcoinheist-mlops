@@ -12,6 +12,7 @@ from sklearn.metrics import classification_report, roc_auc_score
 
 from configs.configs import ModelConfig, PathsConfig, RunConfig
 
+
 class Model:
     def __init__(self):
         self._model = None

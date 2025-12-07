@@ -1,46 +1,82 @@
 from datetime import datetime, timedelta
 
 from airflow import DAG
+from airflow.operators.bash import BashOperator
 from airflow.providers.docker.operators.docker import DockerOperator
+from docker.types import Mount
 
-# This network name must match the compose project network name.
-# If your compose file is infra/docker-compose.yaml, the default is "infra_default".
-DOCKER_NETWORK = "infra_default"
 
 default_args = {
-    "owner": "airflow",
     "depends_on_past": False,
-    "retries": 0,
-    "retry_delay": timedelta(minutes=5),
+    "retries": 1,
+    "retry_delay": timedelta(minutes=1),
+    "start_date": datetime(2025, 1, 1),
 }
 
-with DAG(
-    dag_id="bitcoin_heist_training",
-    default_args=default_args,
-    description="Bitcoin Heist: CSV -> Parquet -> features -> model (with MLflow logging)",
-    start_date=datetime(2025, 1, 1),
-    catchup=False,
-    tags=["bitcoin_heist", "training"],
-) as dag:
+dag = DAG(
+    dag_id="bitcoin-heist-training",
+    default_args=default_args
+)
 
-    init_parquet = DockerOperator(
-        task_id="init_parquet",
-        image="bitcoinheist-app:latest",
-        command="python scripts/csv_to_parquet.py",
-        docker_url="unix://var/run/docker.sock",
-        network_mode=DOCKER_NETWORK,
-        auto_remove=True,
-        mount_tmp_dir=False,
-    )
+log_datetime_start_task = BashOperator(
+    task_id="log_datetime_start", bash_command="date", dag=dag
+)
 
-    train_model = DockerOperator(
-        task_id="train_model",
-        image="bitcoinheist-app:latest",
-        command="python src/main_training.py --preprocess --feat-eng --training",
-        docker_url="unix://var/run/docker.sock",
-        network_mode=DOCKER_NETWORK,
-        auto_remove=True,
-        mount_tmp_dir=False,
-    )
+mounts = [
+    Mount(source="bitcoin-heist-data", target="/bitcoinheist-app/data", type="volume"),
+    Mount(source="bitcoin-heist-models", target="/bitcoinheist-app/models", type="volume"),
+    Mount(source="bitcoin-heist-telemetry", target="/bitcoinheist-app/telemetry", type="volume")
+]
 
-    init_parquet >> train_model
+init_parquet_task = DockerOperator(
+    task_id="init_parquet",
+    docker_url="unix://var/run/docker.sock",
+    image="bitcoinheist-app:latest",
+    command="python scripts/csv_to_parquet.py",
+    network_mode="infra_default",
+    mounts=mounts,
+    dag=dag
+)
+
+preprocessing_task = DockerOperator(
+    task_id="data_preprocessing",
+    docker_url="unix://var/run/docker.sock",
+    image="bitcoinheist-app:latest",
+    command="python src/main_training.py --preprocess",
+    network_mode="infra_default",
+    mounts=mounts,
+    dag=dag
+)
+
+feat_eng_task = DockerOperator(
+    task_id="feature_engineering",
+    docker_url="unix://var/run/docker.sock",
+    image="bitcoinheist-app:latest",
+    command="python src/main_training.py --feat-eng",
+    network_mode="infra_default",
+    mounts=mounts,
+    dag=dag
+)
+
+model_training_task = DockerOperator(
+    task_id="training",
+    docker_url="unix://var/run/docker.sock",
+    image="bitcoinheist-app:latest",
+    command="python src/main_training.py --training",
+    network_mode="infra_default",
+    mounts=mounts,
+    dag=dag,
+)
+
+log_datetime_end_task = BashOperator(
+    task_id="log_datetime_end", bash_command="date", dag=dag
+)
+
+(
+    log_datetime_start_task
+    >> init_parquet_task
+    >> preprocessing_task
+    >> feat_eng_task
+    >> model_training_task
+    >> log_datetime_end_task
+)
