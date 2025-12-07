@@ -42,6 +42,7 @@ services:
     volumes:
       - bitcoin-heist-data:/bitcoinheist-app/data
       - bitcoin-heist-models:/bitcoinheist-app/models
+      - bitcoin-heist-telemetry:/bitcoinheist-app/telemetry
 
   mlflow:
     image: ghcr.io/mlflow/mlflow:v3.3.0rc0
@@ -73,6 +74,33 @@ services:
       test: wget http://localhost:8080/api/v2/monitor/health -o /dev/null || exit 1
       retries: 3
       interval: 5s
+  
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+    volumes:
+      - ./telemetry/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./telemetry/alerts.yml:/etc/prometheus/alerts.yml
+    ports:
+      - "9090:9090"
+    healthcheck:
+      test: wget http://localhost:9090/metrics -S -O - || exit 1
+      retries: 3
+      interval: 5s
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - ./grafana/data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
 
 volumes:
   bitcoin-heist-data:

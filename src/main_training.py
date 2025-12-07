@@ -13,6 +13,7 @@ from src.spark_utils import (
 from src.data_preprocessing import data_preprocessing
 from src.features import get_features
 from src.model import Model
+from src.telemetry.training import write_training_summary
 
 
 @click.command()
@@ -61,6 +62,11 @@ def main(preprocess: bool, feat_eng: bool, training: bool):
             model.evaluate_model(features_data)
 
         model.save_model_local()
+
+        # note: write training telemetry
+        test_summary = model.get_test_summary()
+        write_training_summary(test_summary)
+        print(f"[training] Wrote training summary telemetry to: {PathsConfig.telemetry_training_data_path}")
 
         # note: log to MLflow
         if RunConfig.log_to_mlflow:

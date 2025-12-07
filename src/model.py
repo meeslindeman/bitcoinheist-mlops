@@ -1,16 +1,17 @@
 import os
 import pickle
 import tempfile
-import numpy as np
 from typing import Tuple
 
 import mlflow
+import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import train_test_split, cross_validate
 from sklearn.metrics import classification_report, roc_auc_score
+from sklearn.model_selection import cross_validate, train_test_split
 
 from configs.configs import ModelConfig, PathsConfig, RunConfig
+from src.mlflow_logging import log_model_to_mlflow, load_model_from_mlflow
 
 
 class Model:
@@ -44,6 +45,10 @@ class Model:
     def _ensure_trained(self) -> None:
         if self._model is None:
             raise RuntimeError("Model has not been trained/loaded yet.")
+        
+    @property
+    def _model_file_path(self) -> str:
+        return os.path.join(PathsConfig.model_path, f"{ModelConfig.model_name}.pkl")
     
     def train_model(self, data: pd.DataFrame) -> None:
         X_train, X_test, y_train, y_test = self._get_splits(data)
@@ -78,7 +83,7 @@ class Model:
             raise RuntimeError("Model has not been trained yet.")
         return self._cv_scores
     
-    def evaluate_model(self, data: pd.DataFrame) -> None:
+    def evaluate_model(self, data: pd.DataFrame | None = None) -> None:
         if self._test_report is not None and self._test_roc_auc is not None:
             print("Classification report (test set):")
             print(pd.DataFrame(self._test_report).T.to_string())
@@ -86,26 +91,48 @@ class Model:
             return
 
         if data is None:
-            raise RuntimeError("No stored test metrics and no data provided to recompute.")
+            raise RuntimeError(
+                "No stored test metrics and no data provided to recompute."
+            )
 
         self._ensure_trained()
-        X_train, X_test, y_train, y_test = self._get_splits(data)
+        X_train, X_test, y_train, y_test = self._split_data(data)
         y_pred = self._model.predict(X_test)
         y_proba = self._model.predict_proba(X_test)[:, 1]
 
         print(classification_report(y_test, y_pred))
         print(f"ROC AUC Score: {roc_auc_score(y_test, y_proba)}")
 
+    def get_test_summary(self) -> dict:
+        if self._test_report is None or self._test_roc_auc is None:
+            raise RuntimeError("Test metrics have not been computed yet.")
+
+        positive_label = "1"
+        f1_positive = None
+        if positive_label in self._test_report:
+            f1_positive = self._test_report[positive_label].get("f1-score")
+
+        summary: dict = {
+            "roc_auc": float(self._test_roc_auc),
+            "f1_positive": float(f1_positive) if f1_positive is not None else None,
+        }
+
+        if self._cv_scores is not None and "test_f1" in self._cv_scores:
+            summary["cv_test_f1_mean"] = float(self._cv_scores["test_f1"].mean())
+            summary["cv_test_f1_std"] = float(self._cv_scores["test_f1"].std())
+
+        return summary
+
     def save_model_local(self) -> None:
         self._ensure_trained()
-        path = os.path.join(PathsConfig.model_path, f"{ModelConfig.model_name}.pkl")
+        path = self._model_file_path
         os.makedirs(PathsConfig.model_path, exist_ok=True)
         with open(path, "wb") as f:
             pickle.dump(self._model, f)
         print(f"Model saved to {path}")
 
     def load_model_local(self) -> None:
-        path = os.path.join(PathsConfig.model_path, f"{ModelConfig.model_name}.pkl")
+        path = self._model_file_path
         if not os.path.exists(path):
             raise FileNotFoundError(
                 f"Model file not found at {path}. Did you run training + save_model_local()?"
@@ -115,74 +142,26 @@ class Model:
             self._model = pickle.load(f)
         print(f"Model loaded from {path}")
 
-    def log_model_to_mlflow(self) -> None:
+    def log_model_to_mlflow(self) -> str:
         self._ensure_trained()
         if self._cv_scores is None:
             raise RuntimeError("Model has not been trained yet (no CV scores).")
 
-        mlflow.set_tracking_uri(RunConfig.mlflow_tracking_uri)
+        return log_model_to_mlflow(
+            model=self._model,
+            cv_scores=self._cv_scores,
+            test_report=self._test_report,
+            test_roc_auc=self._test_roc_auc,
+        )
 
-        experiment = mlflow.get_experiment_by_name(RunConfig.experiment_name)
-        if experiment is None:
-            experiment_id = mlflow.create_experiment(RunConfig.experiment_name)
-        else:
-            experiment_id = experiment.experiment_id
-
-        with mlflow.start_run(experiment_id=experiment_id, run_name=RunConfig.run_name) as run:
-            run_id = run.info.run_id
-
-            # log CV scores
-            mlflow.log_dict(self._cv_scores, "cv_scores.json")
-            mlflow.log_metric("cv_test_f1_mean", self._cv_scores["test_f1"].mean())
-            mlflow.log_metric("cv_test_f1_std", self._cv_scores["test_f1"].std())
-            mlflow.log_metric("cv_test_precision_mean", self._cv_scores["test_precision"].mean())
-            mlflow.log_metric("cv_test_recall_mean", self._cv_scores["test_recall"].mean())
-
-            # log test metrics if available
-            if self._test_roc_auc is not None:
-                mlflow.log_metric("test_roc_auc", float(self._test_roc_auc))
-
-            if self._test_report is not None:
-                mlflow.log_dict(self._test_report, "test_classification_report.json")
-
-            # log model artifact under a stable subdirectory (RunConfig.run_name)
-            with tempfile.NamedTemporaryFile("wb", delete=False) as temp_file:
-                tmp_path = temp_file.name
-            model_file_name = f"{ModelConfig.model_name}.pkl"
-            with open(tmp_path, "wb") as f:
-                pickle.dump(self._model, f)
-            mlflow.log_artifact(tmp_path, artifact_path=RunConfig.run_name)
-            os.remove(tmp_path)
-
-            return run_id
-        
     def load_model_from_mlflow(self, run_id: str) -> None:
-        mlflow.set_tracking_uri(RunConfig.mlflow_tracking_uri)
+        model = load_model_from_mlflow(run_id=run_id)
+        self._model = model
 
-        experiment = mlflow.get_experiment_by_name(RunConfig.experiment_name)
-        if experiment is None:
-            raise RuntimeError(f"Experiment {RunConfig.experiment_name} does not exist in MLflow.")
-
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            mlflow.artifacts.download_artifacts(
-                run_id=run_id,
-                artifact_path=RunConfig.run_name,
-                dst_path=tmp_dir,
-            )
-            model_file_name = f"{ModelConfig.model_name}.pkl"
-            artifacts_path = os.path.join(tmp_dir, RunConfig.run_name)
-            model_path = os.path.join(artifacts_path, model_file_name)
-
-            if not os.path.exists(model_path):
-                raise RuntimeError(f"Model file {model_file_name} not found under MLflow artifacts.")
-
-            with open(model_path, "rb") as f:
-                self._model = pickle.load(f)
-
-    def predict(self, features: pd.DataFrame):
+    def predict(self, features: pd.DataFrame) -> np.ndarray:
         self._ensure_trained()
         return self._model.predict(features)
-    
+
     def predict_proba(self, features: pd.DataFrame) -> np.ndarray:
         self._ensure_trained()
         return self._model.predict_proba(features)

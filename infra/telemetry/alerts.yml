@@ -1,0 +1,24 @@
+groups:
+  - name: bitcoinheist-api-alerts
+    rules:
+      - alert: ApiDown
+        expr: up{job="bitcoinheist-api"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Bitcoin Heist API is down"
+          description: "No healthy targets for job 'bitcoinheist-api' for at least 1 minute."
+
+      - alert: HighErrorRate
+        expr: |
+          rate(prediction_errors[5m])
+          /
+          rate(prediction_requests[5m])
+          > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High prediction error rate"
+          description: "Error rate for /predict is above 5% over the last 5 minutes."
