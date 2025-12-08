@@ -1,25 +1,4 @@
 services:
-  # init-parquet:
-  #   image: bitcoinheist-app:latest
-  #   command: python scripts/csv_to_parquet.py
-  #   restart: "no"
-  #   volumes:
-  #     - bitcoin-heist-data:/bitcoinheist-app/data
-
-  # training:
-  #   image: bitcoinheist-app:latest
-  #   command: python src/main_training.py --preprocess --feat-eng --training
-  #   depends_on:
-  #     init-parquet:
-  #       condition: service_completed_successfully
-  #     mlflow:
-  #       condition: service_healthy
-  #   restart: "no"
-  #   volumes:
-  #     - bitcoin-heist-data:/bitcoinheist-app/data
-  #     - bitcoin-heist-models:/bitcoinheist-app/models
-  #     - bitcoin-heist-telemetry:/bitcoinheist-app/telemetry
-
   app:
     image: bitcoinheist-app:latest
     command: flask --app src.main_api run --host 0.0.0.0 --port 5001
@@ -104,8 +83,11 @@ services:
 
 volumes:
   bitcoin-heist-data:
+    external: true
   bitcoin-heist-models:
+    external: true
   bitcoin-heist-telemetry:
+    external: true
   mlflow-data:
 
 networks:

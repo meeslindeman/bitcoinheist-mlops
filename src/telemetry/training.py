@@ -30,19 +30,24 @@ def load_training_summary() -> Dict[str, Any] | None:
 
 TRAINING_LAST_RUN_TIMESTAMP = Gauge(
     "training_last_run_timestamp_seconds",
-    "Unix timestamp of the last successful training run",
+    "Unix timestamp of the last successful training run"
+)
+
+TRAINING_LAST_ACCURACY = Gauge(
+    "training_last_accuracy",
+    "Accuracy of the last training run (test set)"
 )
 
 
 TRAINING_LAST_ROC_AUC = Gauge(
     "training_last_roc_auc",
-    "ROC AUC of the last training run (test set)",
+    "ROC AUC of the last training run (test set)"
 )
 
 
 TRAINING_LAST_F1_POSITIVE = Gauge(
     "training_last_f1_positive",
-    "F1-score for the positive class of the last training run (test set)",
+    "F1-score for the positive class of the last training run (test set)"
 )
 
 
@@ -58,6 +63,10 @@ def init_training_metrics_from_file() -> None:
             TRAINING_LAST_RUN_TIMESTAMP.set(data.timestamp())
         except Exception:
             pass
+
+    accuracy = summary.get("accuracy")
+    if accuracy is not None:
+        TRAINING_LAST_ACCURACY.set(float(accuracy))
     
     roc_auc = summary.get("roc_auc")
     if roc_auc is not None:

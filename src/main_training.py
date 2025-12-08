@@ -61,8 +61,6 @@ def main(preprocess: bool, feat_eng: bool, training: bool):
             print("\n[training] Test metrics:")
             model.evaluate_model(features_data)
 
-        model.save_model_local()
-
         # note: write training telemetry
         test_summary = model.get_test_summary()
         write_training_summary(test_summary)

@@ -1,4 +1,4 @@
-from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
+from prometheus_client import Counter, Histogram
 
 PREDICTION_REQUESTS = Counter(
     "prediction_requests",
@@ -20,6 +20,3 @@ PREDICTION_LABELS = Counter(
     "Count of predictions by label",
     ["prediction"]
 )
-
-def metrics_response():
-    return generate_latest(), 200, {"Content-Type": CONTENT_TYPE_LATEST}

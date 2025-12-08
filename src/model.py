@@ -1,23 +1,20 @@
-import os
-import pickle
-import tempfile
-from typing import Tuple
-
-import mlflow
 import numpy as np
 import pandas as pd
+
+from typing import Tuple
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import classification_report, roc_auc_score
+from sklearn.metrics import classification_report, roc_auc_score, accuracy_score
 from sklearn.model_selection import cross_validate, train_test_split
 
-from configs.configs import ModelConfig, PathsConfig, RunConfig
-from src.mlflow_logging import log_model_to_mlflow, load_model_from_mlflow
+from configs.configs import ModelConfig, RunConfig
+from src.mlflow_utils import log_model_to_mlflow, load_model_from_mlflow
 
 
 class Model:
     def __init__(self):
         self._model = None
         self._cv_scores: dict | None = None
+        self._test_accuracy: float | None = None
         self._test_report: dict | None = None
         self._test_roc_auc: float | None = None
     
@@ -46,10 +43,6 @@ class Model:
         if self._model is None:
             raise RuntimeError("Model has not been trained/loaded yet.")
         
-    @property
-    def _model_file_path(self) -> str:
-        return os.path.join(PathsConfig.model_path, f"{ModelConfig.model_name}.pkl")
-    
     def train_model(self, data: pd.DataFrame) -> None:
         X_train, X_test, y_train, y_test = self._get_splits(data)
 
@@ -70,6 +63,7 @@ class Model:
         y_pred = self._model.predict(X_test)
         y_proba = self._model.predict_proba(X_test)[:, 1]
 
+        self._test_accuracy = accuracy_score(y_test, y_pred)
         self._test_report = classification_report(
             y_test,
             y_pred,
@@ -91,12 +85,10 @@ class Model:
             return
 
         if data is None:
-            raise RuntimeError(
-                "No stored test metrics and no data provided to recompute."
-            )
+            raise RuntimeError("No stored test metrics and no data provided to recompute.")
 
         self._ensure_trained()
-        X_train, X_test, y_train, y_test = self._split_data(data)
+        X_train, X_test, y_train, y_test = self._get_splits(data)
         y_pred = self._model.predict(X_test)
         y_proba = self._model.predict_proba(X_test)[:, 1]
 
@@ -113,8 +105,9 @@ class Model:
             f1_positive = self._test_report[positive_label].get("f1-score")
 
         summary: dict = {
+            "accuracy": float(self._test_accuracy) if self._test_accuracy is not None else None,
             "roc_auc": float(self._test_roc_auc),
-            "f1_positive": float(f1_positive) if f1_positive is not None else None,
+            "f1_positive": float(f1_positive) if f1_positive is not None else None
         }
 
         if self._cv_scores is not None and "test_f1" in self._cv_scores:
@@ -122,25 +115,6 @@ class Model:
             summary["cv_test_f1_std"] = float(self._cv_scores["test_f1"].std())
 
         return summary
-
-    def save_model_local(self) -> None:
-        self._ensure_trained()
-        path = self._model_file_path
-        os.makedirs(PathsConfig.model_path, exist_ok=True)
-        with open(path, "wb") as f:
-            pickle.dump(self._model, f)
-        print(f"Model saved to {path}")
-
-    def load_model_local(self) -> None:
-        path = self._model_file_path
-        if not os.path.exists(path):
-            raise FileNotFoundError(
-                f"Model file not found at {path}. Did you run training + save_model_local()?"
-            )
-
-        with open(path, "rb") as f:
-            self._model = pickle.load(f)
-        print(f"Model loaded from {path}")
 
     def log_model_to_mlflow(self) -> str:
         self._ensure_trained()
@@ -152,6 +126,7 @@ class Model:
             cv_scores=self._cv_scores,
             test_report=self._test_report,
             test_roc_auc=self._test_roc_auc,
+            test_accuracy=self._test_accuracy
         )
 
     def load_model_from_mlflow(self, run_id: str) -> None:

@@ -50,6 +50,7 @@ pillow==11.3.0
 pluggy==1.6.0
 protobuf==6.32.0
 prometheus-client
+prometheus-flask-exporter
 py4j==0.10.9.9
 pyarrow==21.0.0
 pyasn1==0.6.1

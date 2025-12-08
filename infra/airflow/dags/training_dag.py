@@ -68,6 +68,12 @@ model_training_task = DockerOperator(
     dag=dag,
 )
 
+reload_task = BashOperator(
+    task_id="reload_api_model",
+    bash_command="curl -X POST http://app:5001/reload",
+    dag=dag,
+)
+
 log_datetime_end_task = BashOperator(
     task_id="log_datetime_end", bash_command="date", dag=dag
 )
@@ -78,5 +84,6 @@ log_datetime_end_task = BashOperator(
     >> preprocessing_task
     >> feat_eng_task
     >> model_training_task
+    >> reload_task
     >> log_datetime_end_task
 )
