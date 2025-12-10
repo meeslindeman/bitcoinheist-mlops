@@ -19,7 +19,9 @@ dag = DAG(
 )
 
 log_datetime_start_task = BashOperator(
-    task_id="log_datetime_start", bash_command="date", dag=dag
+    task_id="log_datetime_start", 
+    bash_command="date", 
+    dag=dag
 )
 
 mounts = [
@@ -71,11 +73,13 @@ model_training_task = DockerOperator(
 reload_task = BashOperator(
     task_id="reload_api_model",
     bash_command="curl -X POST http://app:5001/reload",
-    dag=dag,
+    dag=dag
 )
 
 log_datetime_end_task = BashOperator(
-    task_id="log_datetime_end", bash_command="date", dag=dag
+    task_id="log_datetime_end", 
+    bash_command="date", 
+    dag=dag
 )
 
 (

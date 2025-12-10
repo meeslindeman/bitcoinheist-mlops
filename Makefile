@@ -1,4 +1,4 @@
-.PHONY: test format build build-nocache up up-app down clean logs-app test-integration
+.PHONY: test format build build-nocache up drift down clean logs-app test-integration
 
 # note: unit tests and coverage for src/ only (local tests)
 test:
@@ -18,6 +18,10 @@ build-nocache:
 up: build
 	docker compose --file infra/docker-compose.yaml down
 	docker compose --file infra/docker-compose.yaml up -d mlflow airflow prometheus pushgateway grafana app
+
+drift:
+	docker compose --file infra/docker-compose.yaml exec app \
+		sh -c "python -m src.telemetry.mock_live_data && python -m src.telemetry.psi_monitor"
 
 down:
 	docker compose --file infra/docker-compose.yaml down

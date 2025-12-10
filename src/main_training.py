@@ -3,7 +3,8 @@ import click
 
 from configs.configs import (
     PathsConfig,
-    RunConfig
+    RunConfig,
+    TelemetryConfig
 )
 from src.spark_utils import (
     read_raw_data,
@@ -67,9 +68,11 @@ def main(preprocess: bool, feat_eng: bool, training: bool):
         push_training_summary(test_summary)
         print("[training] Pushed training summary metrics to Pushgateway")
 
-        # note: save training data distribution for data drift monitoring
-        save_training_distribution(features_data)
-        print(f"[training] Wrote training data distribution to: {PathsConfig.telemetry_training_data_dist_path}")
+        # note: save preprocessed data distribution for data drift monitoring
+        preprocessed_data = read_data(path=PathsConfig.preprocessed_data_path)
+        preprocessed_df = preprocessed_data.toPandas()
+        save_training_distribution(preprocessed_df)
+        print(f"[training] Wrote training data distribution to: {TelemetryConfig.telemetry_training_data_dist_path}")
 
         # note: log to MLflow
         if RunConfig.log_to_mlflow:

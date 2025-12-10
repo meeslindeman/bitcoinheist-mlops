@@ -48,7 +48,7 @@ def push_training_summary(summary: Dict[str, Any]) -> None:
         last_f1_positive.set(float(f1_positive))
         
     push_to_gateway(
-        TelemetryConfig.push_gateway_uri,
+        TelemetryConfig.push_gateway_url,
         job="training",
         registry=registry,
     )

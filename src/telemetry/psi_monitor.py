@@ -1,5 +1,3 @@
-# src/telemetry/psi_monitor.py
-
 import json
 import logging
 import math
@@ -104,7 +102,7 @@ def compute_psi_for_feature(
     return float(get_psi(training_percentages, latest_percentages))
 
 
-def main():  # pragma: no cover
+def run_psi_monitor(): 
     features = TelemetryConfig.monitored_features
 
     training_dist = load_training_dist()
@@ -131,7 +129,6 @@ def main():  # pragma: no cover
         psi = compute_psi_for_feature(feature, training_dist[feature], live_window[feature])
         psi_values[feature] = psi
 
-    # Push metrics to Pushgateway
     registry = CollectorRegistry()
 
     psi_gauge = Gauge(
@@ -143,18 +140,6 @@ def main():  # pragma: no cover
     miss_gauge = Gauge(
         "feature_missing_ratio",
         "Fraction of missing values per feature over monitoring window",
-        labelnames=["feature"],
-        registry=registry,
-    )
-    mean_gauge = Gauge(
-        "feature_mean",
-        "Mean of numeric feature over monitoring window",
-        labelnames=["feature"],
-        registry=registry,
-    )
-    std_gauge = Gauge(
-        "feature_std",
-        "Std of numeric feature over monitoring window",
         labelnames=["feature"],
         registry=registry,
     )
@@ -172,11 +157,6 @@ def main():  # pragma: no cover
 
         miss_gauge.labels(feature=feature).set(float(stats["missing_ratio"]))
 
-        if stats["mean"] is not None:
-            mean_gauge.labels(feature=feature).set(float(stats["mean"]))
-        if stats["std"] is not None:
-            std_gauge.labels(feature=feature).set(float(stats["std"]))
-
     drift_job_last_success = Gauge(
         "drift_job_last_success_timestamp_seconds",
         "Unix timestamp of the last successful drift monitoring job run",
@@ -185,13 +165,15 @@ def main():  # pragma: no cover
     drift_job_last_success.set(time())
 
     push_to_gateway(
-        TelemetryConfig.push_gateway_uri,
+        TelemetryConfig.push_gateway_url,
         job="drift_monitoring",
         registry=registry,
     )
 
     print("[psi-monitor] Pushed PSI + live stats to Pushgateway.")
 
-
+def main():
+    run_psi_monitor()
+    
 if __name__ == "__main__":
     main()

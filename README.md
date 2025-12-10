@@ -86,6 +86,13 @@ Training performs:
 - Parquet → preprocessing → feature engineering → model training 
 - MLflow logs experiment and model artifacts
 
+4. Once the training DAG has finished successfully, run:
+```bash
+make drift
+```
+This generates `telemetry/live_data_dist.json` by sampling from the features parquet.
+A psi monitor then reads `data_dist.json` and `live_data_dist.json`, computes PSI + missing ratio + mean + std per feature, and pushes metrics to Pushgateway.
+
 4. Run integration tests
 ```bash
 make test-integration
