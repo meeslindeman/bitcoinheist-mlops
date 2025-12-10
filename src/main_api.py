@@ -2,7 +2,7 @@ import json
 import pandas as pd
 
 from time import time
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, render_template
 from functools import cache
 from prometheus_flask_exporter import PrometheusMetrics
 
@@ -19,7 +19,7 @@ from src.telemetry.api import (
     PREDICTION_LABELS
 )
 
-app = Flask(__name__)
+app = Flask(__name__, template_folder="templates", static_folder="static")
 metrics = PrometheusMetrics(app, defaults_prefix="bitcoin_heist")
 metrics.info(
     "bitcoin_heist_model_version",
@@ -93,12 +93,12 @@ def predict():
             return jsonify({"error": "Model features not initialized yet."}), 503
 
         # note: validate payload
-        payload = request.get_json()
-        if payload is None:
+        data = request.get_json()
+        if data is None:
             PREDICTION_ERRORS.inc()
             return jsonify({"error": "Invalid or missing JSON body"}), 400
 
-        input_pd = pd.DataFrame([payload])
+        input_pd = pd.DataFrame([data])
 
         if "address" in input_pd.columns:
             input_pd = input_pd.drop(columns=["address"])
@@ -124,7 +124,7 @@ def predict():
         PREDICTION_LABELS.labels(prediction=prediction).inc()
 
         return (
-            jsonify({"ransomware_probability": proba, "prediction": prediction}),
+            jsonify({"prediction": prediction, "probability": proba}),
             200,
         )
 
@@ -137,3 +137,8 @@ def predict():
     finally:
         runtime = time() - start_time
         PREDICTION_LATENCY.observe(runtime)
+
+# note: simple UI 
+@app.get("/")
+def index():
+    return render_template("index.html")

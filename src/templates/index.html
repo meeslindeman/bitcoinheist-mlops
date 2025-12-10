@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Bitcoin Heist Ransomware Classifier</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <div class="shell">
+    <header class="header">
+      <div class="header-main">
+        <div class="title">
+          Bitcoin Heist Ransomware Classifier
+          <span class="title-pill">Demo UI</span>
+        </div>
+        <p class="subtitle">
+          Send a single transaction profile as JSON to the
+          <code>/predict</code> endpoint. The API returns whether the address
+          is likely <strong>ransomware</strong> or <strong>clean</strong> along with
+          the predicted probability.
+        </p>
+      </div>
+      <div class="header-meta">
+        <div class="pill-status">
+          <span class="dot"></span>
+          API served from <code>localhost:5001</code>
+        </div>
+        <div class="tag">
+          endpoint: <code>POST /predict</code>
+        </div>
+      </div>
+    </header>
+
+    <main class="main">
+      <div class="columns">
+        <section class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">
+                Request payload
+                <span class="badge">Features</span>
+              </div>
+              <div class="hint">
+                Edit the JSON below or use one of the predefined examples.
+              </div>
+            </div>
+          </div>
+
+          <div class="chip-row">
+            <div class="chip"><span>year</span> · transaction year</div>
+            <div class="chip"><span>day</span> · day of year</div>
+            <div class="chip"><span>length</span> · chain length</div>
+            <div class="chip"><span>weight</span> · sum of amounts</div>
+            <div class="chip"><span>count</span> · number of transactions</div>
+            <div class="chip"><span>looped</span> · 0/1 loop flag</div>
+            <div class="chip"><span>neighbors</span> · neighbor addresses</div>
+            <div class="chip"><span>income</span> · total income</div>
+          </div>
+
+          <textarea id="requestInput"></textarea>
+
+          <div class="toolbar">
+            <button id="btnExampleClean" type="button" class="secondary">
+              Example: likely clean
+            </button>
+            <button id="btnExampleHeist" type="button">
+              Example: likely ransomware
+            </button>
+          </div>
+
+          <div class="toolbar">
+            <button id="btnSend" type="button">
+              Send to /predict
+            </button>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">
+                API response
+                <span class="badge">Model output</span>
+              </div>
+              <div class="hint">
+                Raw JSON returned by the Flask API, including prediction and
+                ransomware probability.
+              </div>
+            </div>
+            <div class="legend">
+              <span>
+                <span class="square clean"></span>
+                clean
+              </span>
+              <span>
+                <span class="square ransomware"></span>
+                ransomware
+              </span>
+            </div>
+          </div>
+
+          <pre id="responseOutput">No request sent yet.</pre>
+
+          <div class="status-line">
+            <div>
+              <span class="status-label">Classification:</span>
+              <span id="statusPrediction" class="status-prediction clean" style="display:none;">
+                <span class="dot-mini"></span>
+                <span id="statusPredictionLabel"></span>
+              </span>
+            </div>
+            <div id="statusProbability"></div>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>

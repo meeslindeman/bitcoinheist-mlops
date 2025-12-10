@@ -55,7 +55,7 @@ class Model:
             cv=RunConfig.num_folds,
             return_train_score=True,
             n_jobs=-1,
-            scoring=["precision", "recall", "f1"]
+            scoring=["accuracy", "precision", "recall", "f1"]
         )
 
         self._model = classifier.fit(X_train, y_train)

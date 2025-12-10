@@ -17,9 +17,6 @@ up: build
 	docker compose --file infra/docker-compose.yaml down
 	docker compose --file infra/docker-compose.yaml up -d mlflow airflow prometheus grafana app
 
-up-app:
-	docker compose --file infra/docker-compose.yaml up -d app
-
 down:
 	docker compose --file infra/docker-compose.yaml down
 

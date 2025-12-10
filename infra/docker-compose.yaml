@@ -5,10 +5,8 @@ services:
     depends_on:
       mlflow:
         condition: service_healthy
-      # prometheus:
-      #   condition: service_healthy
-      # telemetry_job:
-      #   condition: service_started
+      prometheus:
+        condition: service_healthy
     ports:
       - "5001:5001"
     restart: "always"
