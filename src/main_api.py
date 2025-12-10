@@ -99,12 +99,19 @@ def predict():
             PREDICTION_ERRORS.inc()
             return jsonify({"error": "Model features not initialized yet."}), 503
 
-        # note: validate payload
+        # note: validate prediction input
         # note: silent=True so we return None for invalid JSON and handle it ourselves
         data = request.get_json(silent=True) 
         if data is None:
             PREDICTION_ERRORS.inc()
             return jsonify({"error": "Invalid or missing JSON body"}), 400
+        
+        # note: validate required fields
+        required_fields = ["year", "day", "length", "weight", "count", "looped", "neighbors", "income"]
+        missing = [f for f in required_fields if f not in data]
+        if missing:
+            PREDICTION_ERRORS.inc()
+            return (jsonify({"error": "Missing required input fields", "missing_fields": missing}), 400)
 
         input_pd = pd.DataFrame([data])
 

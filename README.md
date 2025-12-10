@@ -5,61 +5,107 @@ Features: reproducible PySpark preprocessing, MySQL-backed storage, Dockerized e
 
 ---
 
-## References
+## Data Prep
 
-- Dataset (UCI): https://archive.ics.uci.edu/dataset/526/bitcoinheistransomwareaddressdataset  
-- Paper (feature definitions and analysis): https://arxiv.org/pdf/1906.07852  
-- External GitHub implementation: https://github.com/toji-ut/BitcoinHeistRansomwareAnalytics  
+The system requires the raw BitcoinHeist dataset (CSV format) from the UCI Machine Learning Repository:
 
-Set project path manually (if needed):
-```bash
-export PYTHONPATH=$(pwd)
-```
+Download: https://archive.ics.uci.edu/dataset/526/bitcoinheistransomwareaddressdataset
+
+Place the file at: `data/BitcoinHeistData.csv`.
+
+This file is consumed by the initialization step (`csv_to_parquet`) to produce the Parquet dataset used throughout preprocessing, feature engineering, and training.
 
 ## Dataset Feature Notes
 
 | Feature | Definition | Usefullness |
 | ------- |----------- | ----------- |
-| **Income** | Total coins received (`sum(outputs → address)`) | Captures payment magnitude — ransom payments cluster around specific BTC amounts. |
+| **Income** | Satoshi amount (1 bitcoin = 100 million satoshis) | Captures payment magnitude — ransom payments cluster around specific BTC amounts. |
 | **Neighbors** | Number of transactions sending to that address | Ransomware wallets often have few unique payers, unlike exchanges with many. |
 | **Weight** | Sum of fractions of starter transactions’ coins reaching the address | Quantifies coin merging behavior (aggregation of payments). |
 | **Length** | Longest chain length from a “starter” transaction to the address | Indicates how deep in the transaction graph the address sits (useful for detecting coin-mixing). |
 | **Count** | Number of distinct starter transactions connected through chains | Measures how many separate flows converge to that address. |
 | **Loop** | Number of starter transactions connected through *multiple* directed paths | Identifies obfuscation or coin-mixing loops. |
 
-## Pipeline Overview
-1. CSV → MySQL via `scripts/csv_to_mysql.py`.
-2. Preprocessing in PySpark, saved to MySQL.
-3. Feature engineering (log, ratios, temporal, z-scores), saved to MySQL.
-4. Model training runs in Python on final feature table.
+## System Architecture Overview
 
-## Docker Commands
-Build image:
+Offline (Batch) Pipeline
+1. Parquet initialization
+    Convert raw CSV → Parquet (`scripts/csv_to_parquet.py`).
+2. Distributed preprocessing (PySpark)
+    Cleans data, enforces schema.
+3. Feature engineering
+    Log transforms, ratios, z-scores, categorical cleanup.
+4. Model training
+    MLflow-tracked experiment, persisted model artefacts in models/.
+5. Airflow DAG (`training_dag.py`) orchestrates the full batch pipeline.
+
+Online (HTTP API)
+- Fast inference endpoint (`/predict`) served via Flask in its own container.
+- Loads same model artefacts as training stage.
+- Logs inference telemetry to local volume (Prometheus-scrapable format).
+
+## Test Coverage
+
+Unit Tests (`make test`)
+Covers:
+- Feature generators
+- Preprocessing helpers
+- Model training wrapper
+- MLflow logging
+- Telemetry instrumentation
+
+Integration Tests (`make test-integration`)
+Runs inside Docker Compose against:
+- API container
+- Model artefacts
+- Example inference requests
+
+Ensures:
+- API contract stability
+- Correct model loading
+- Valid prediction outputs
+
+## Makefile Workflow
+
+Note: everything runs in the background.
+
+1. Run all unit tests
 ```bash
-docker build -f infra/build/Dockerfile -t bitcoinheist-app:latest .
+make test
 ```
 
-Start full stack:
+2. Start full stack (MLflow, Spark, Airflow, API)
 ```bash
-docker compose -f infra/docker-compose.yaml up
+make up
 ```
 
-Force rebuild/restart:
+3. Trigger the Airflow training pipeline
+Open Airflow UI (http://localhost:4242/dags) and trigger `bitcoin-heist-training`.
+
+Training performs:
+- Parquet → preprocessing → feature engineering → model training 
+- MLflow logs experiment and model artifacts
+
+4. Run integration tests
 ```bash
-docker compose -f infra/docker-compose.yaml up --force-recreate --remove-orphans
+make test-integration
 ```
 
-Shut down:
+5. Use the live API interface
+Open http://localhost:5001/ and submit values to receive prediction.
+
+6. Shutdown system
 ```bash
-docker compose -f infra/docker-compose.yaml down
+make down
 ```
 
-Rebuild image explicitly:
+7. (Optional) Track logging
 ```bash
-docker compose -f infra/docker-compose.yaml build --no-cache
+make logs-app
 ```
 
-## Notes
+## References
 
-- The pipeline expects the BitcoinHeist CSV at `data/BitcoinHeistData.csv`.
-- PySpark runs inside the application container using OpenJDK 17.
+- Dataset (UCI): https://archive.ics.uci.edu/dataset/526/bitcoinheistransomwareaddressdataset  
+- Paper (feature definitions and analysis): https://arxiv.org/pdf/1906.07852  
+- External GitHub implementation: https://github.com/toji-ut/BitcoinHeistRansomwareAnalytics  

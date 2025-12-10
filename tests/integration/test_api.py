@@ -62,7 +62,7 @@ def test_predict_with_missing_feature(client):
     input.pop("income")  
 
     resp = client.post("/predict", json=input)
-    assert resp.status_code == 200
+    assert resp.status_code == 400
 
     data = resp.get_json()
     assert "prediction" in data
