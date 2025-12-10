@@ -29,7 +29,14 @@ metrics.info(
     model_name=ModelConfig.model_name,
 )
 
-spark = get_spark_session(app_name="bitcoin-heist-api")
+# note: lazy import for testing purposes
+spark = None
+
+def get_spark():
+    global spark
+    if spark is None:
+        spark = get_spark_session(app_name="bitcoin-heist-api")
+    return spark
 
 try:
     with open(PathsConfig.feature_columns_path, "r") as f:
@@ -93,7 +100,8 @@ def predict():
             return jsonify({"error": "Model features not initialized yet."}), 503
 
         # note: validate payload
-        data = request.get_json()
+        # note: silent=True so we return None for invalid JSON and handle it ourselves
+        data = request.get_json(silent=True) 
         if data is None:
             PREDICTION_ERRORS.inc()
             return jsonify({"error": "Invalid or missing JSON body"}), 400
@@ -104,7 +112,7 @@ def predict():
             input_pd = input_pd.drop(columns=["address"])
 
         # note: extract features 
-        input_spark = spark.createDataFrame(input_pd)
+        input_spark = get_spark().createDataFrame(input_pd)
         features_spark = get_features(input_spark)
         features_pd = features_spark.toPandas()
 
