@@ -10,7 +10,6 @@ from configs.configs import PathsConfig, RunConfig, ModelConfig
 from src.features import get_features
 from src.model import Model
 from src.spark_utils import get_spark_session
-from src.telemetry.training import init_training_metrics_from_file
 from src.mlflow_utils import get_latest_run_id
 from src.telemetry.api import (
     PREDICTION_REQUESTS,
@@ -45,11 +44,6 @@ except FileNotFoundError:
     app.logger.warning("Feature columns file not found at startup, run the training pipeline before requesting predictions.")
     FEATURE_COLUMNS = None
 
-try:
-    init_training_metrics_from_file()
-except Exception as e:
-    app.logger.warning(f"Could not initialize training metrics at startup: {e}")
-
 @app.get("/health")
 def health():
     return jsonify({"status": "ok"}), 200
@@ -69,11 +63,6 @@ def reload_model():
     try:
         get_model.cache_clear()
         _ = get_model()
-        try:
-            init_training_metrics_from_file()
-        except Exception as e:
-            app.logger.warning(f"Failed to re-init training metrics: {e}")
-
         return jsonify({"status": "ok", "message": "Model reloaded from MLflow"}), 200
 
     except Exception as e:

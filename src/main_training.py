@@ -13,7 +13,8 @@ from src.spark_utils import (
 from src.data_preprocessing import data_preprocessing
 from src.features import get_features
 from src.model import Model
-from src.telemetry.training import write_training_summary
+from src.telemetry.training import push_training_summary
+from src.telemetry.training_data import save_training_distribution
 
 
 @click.command()
@@ -61,15 +62,20 @@ def main(preprocess: bool, feat_eng: bool, training: bool):
             print("\n[training] Test metrics:")
             model.evaluate_model(features_data)
 
-        # note: write training telemetry
+        # note: write training telemetry metrics
         test_summary = model.get_test_summary()
-        write_training_summary(test_summary)
-        print(f"[training] Wrote training summary telemetry to: {PathsConfig.telemetry_training_data_path}")
+        push_training_summary(test_summary)
+        print("[training] Pushed training summary metrics to Pushgateway")
+
+        # note: save training data distribution for data drift monitoring
+        save_training_distribution(features_data)
+        print(f"[training] Wrote training data distribution to: {PathsConfig.telemetry_training_data_dist_path}")
 
         # note: log to MLflow
         if RunConfig.log_to_mlflow:
             logged_run_id = model.log_model_to_mlflow()
             print(f"[training] Logged model to MLflow run: {logged_run_id}")
+
 
 if __name__ == "__main__":
     main()

@@ -64,14 +64,9 @@ def test_predict_with_missing_feature(client):
     resp = client.post("/predict", json=input)
     assert resp.status_code == 400
 
-    data = resp.get_json()
-    assert "prediction" in data
-    assert "probability" in data
-    assert 0.0 <= data["probability"] <= 1.0
-
 
 # note: if an unknown feature is provided, the API should ignore it
-def test_predict_with_unknown_feature_is_ignored(client):
+def test_predict_with_unknown_feature(client):
     input = {
         "year": 2014,
         "day": 150,

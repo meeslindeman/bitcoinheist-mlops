@@ -34,9 +34,6 @@ def log_model_to_mlflow(model: BaseEstimator, cv_scores: dict, test_report: Opti
         if test_report is not None:
             mlflow.log_dict(test_report, "test_classification_report.json")
 
-        # with tempfile.NamedTemporaryFile("wb", delete=False) as temp_file:
-        #     tmp_path = temp_file.name
-
         model_file_name = f"{ModelConfig.model_name}.pkl"
 
         with tempfile.TemporaryDirectory() as tmp_dir:

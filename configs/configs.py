@@ -15,7 +15,18 @@ class PathsConfig:
     model_file_path: str = str(Path(model_path) / "BitcoinHeist.pkl") 
     feature_columns_path: str = str(Path(model_path) / "feature_columns.json")
 
-    telemetry_training_data_path: str = str(PROJECT_ROOT / "telemetry" / "training_summary.json")
+
+class TelemetryConfig:
+    # note: presumably most important features to monitor for data drift
+    monitored_features = ["income", "neighbors", "weight"]  
+    epsilon = 1e-6
+    num_instances_for_live_dist = 10
+
+    # note: paths to store data distributions
+    telemetry_training_data_dist_path = str(PROJECT_ROOT / "telemetry" / "data_dist.json")
+    telemetry_live_data_dist_path: str = str(PROJECT_ROOT / "telemetry" / "live_data_dist.json")
+
+    push_gateway_url: str = "http://pushgateway:9091"
 
 
 @dataclass(init=False, frozen=True)

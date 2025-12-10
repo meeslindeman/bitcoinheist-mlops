@@ -65,6 +65,15 @@ services:
       test: wget http://localhost:9090/metrics -S -O - || exit 1
       retries: 3
       interval: 5s
+  
+  pushgateway:
+    image: prom/pushgateway:v1.11.1
+    ports:
+      - "9091:9091"
+    healthcheck:
+      test: wget http://localhost:9091/metrics -S -O - || exit 1
+      retries: 3
+      interval: 5s
 
   grafana:
     image: grafana/grafana:latest

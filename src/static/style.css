@@ -140,14 +140,6 @@ pre {
   vertical-align: middle;
 }
 
-.square.clean {
-  background: #8bc34a;
-}
-
-.square.ransomware {
-  background: #e57373;
-}
-
 .status-line {
   margin-top: 10px;
   font-size: 14px;
