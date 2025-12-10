@@ -108,7 +108,7 @@ def run_psi_monitor():
     training_dist = load_training_dist()
     live_df = load_live_df()
 
-    n = TelemetryConfig.num_instances_for_live_dist
+    n = 1000
     live_window = live_df.head(n)
     if live_window.shape[0] < n:
         logger.warning(

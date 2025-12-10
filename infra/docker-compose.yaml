@@ -107,7 +107,3 @@ volumes:
   bitcoin-heist-telemetry:
     external: true
   mlflow-data:
-
-networks:
-  default:
-    name: infra_default

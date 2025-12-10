@@ -2,7 +2,7 @@ import json
 import click
 
 from configs.configs import PathsConfig, RunConfig, TelemetryConfig
-from utils.spark_utils import read_raw_data, write_data, read_data
+from src.utils.spark_utils import read_raw_data, write_data, read_data
 from src.pipeline.data_preprocessing import data_preprocessing
 from src.pipeline.features import get_features
 from src.pipeline.feature_extractor import FeatureExtractor
