@@ -70,6 +70,7 @@ Ensures:
 Note: everything runs in the background.
 
 1. Run all unit tests
+Note: make sure `requirements.txt` is also installed in your local machine (via virtual environment).
 ```bash
 make test
 ```

@@ -2,7 +2,7 @@ import numpy as np
 from sklearn.ensemble import RandomForestClassifier
 
 from configs.configs import RunConfig
-from src.mlflow_utils import log_model_to_mlflow, load_model_from_mlflow, get_latest_run_id
+from src.utils.mlflow_utils import log_model_to_mlflow, load_model_from_mlflow, get_latest_run_id
 
 
 # note: helper to create a tiny trained model for testing

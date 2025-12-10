@@ -4,13 +4,7 @@ import pandas as pd
 import pytest
 from pyspark.testing.utils import assertDataFrameEqual
 
-from src.features import (
-    get_log_transformed_features,
-    get_ratio_features,
-    get_temporal_features,
-    _get_z_score,
-    get_features,
-)
+from src.pipeline.features import get_log_transformed_features, get_ratio_features, get_temporal_features, get_features
 
 
 def test_get_log_transformed_features(spark_fixture):
@@ -254,71 +248,6 @@ def test_get_temporal_features_missing_values(spark_fixture):
     assert math.isfinite(r2["cos_day"])
 
 
-def test_get_z_score_global(spark_fixture):
-    data = spark_fixture.createDataFrame(
-        [
-            {"income": 1.0},
-            {"income": 2.0},
-            {"income": 3.0},
-        ]
-    )
-
-    out = _get_z_score(data, value_col="income")
-
-    # note: mean = 2, std = 1, so z = income - 2
-    expected = spark_fixture.createDataFrame(
-        [
-            {"income": 1.0, "z_income": -1.0},
-            {"income": 2.0, "z_income": 0.0},
-            {"income": 3.0, "z_income": 1.0},
-        ]
-    )
-
-    assertDataFrameEqual(
-        out.select("income", "z_income"),
-        expected,
-        ignoreColumnOrder=True,
-    )
-
-
-def test_get_z_score_grouped(spark_fixture):
-    data = spark_fixture.createDataFrame(
-        [
-            {"income": 1.0, "year": 2010},
-            {"income": 3.0, "year": 2010},
-            {"income": 10.0, "year": 2011},
-            {"income": 10.0, "year": 2011},
-        ]
-    )
-
-    out = _get_z_score(data, value_col="income", group_by_cols=["year"])
-
-    rows = { (r["year"], r["income"]): r["z_income_by_year"] for r in out.collect() }
-
-    # note: year 2010: incomes [1,3] -> mean=2, std= sqrt(((1-2)^2+(3-2)^2)/(n-1)) = sqrt(2)
-    assert rows[(2010, 1.0)] == pytest.approx((1.0 - 2.0) / (2.0 ** 0.5))
-    assert rows[(2010, 3.0)] == pytest.approx((3.0 - 2.0) / (2.0 ** 0.5))
-
-    # note: year 2011: incomes [10,10] -> std=0 -> z should be 0.0 by design
-    assert rows[(2011, 10.0)] == pytest.approx(0.0)
-
-
-def test_get_z_score_with_nulls(spark_fixture):
-    data = spark_fixture.createDataFrame(
-        [
-            {"income": 10.0},
-            {"income": None},
-            {"income": 20.0},
-        ]
-    )
-
-    out = _get_z_score(data, value_col="income")
-    rows = {r["income"]: r["z_income"] for r in out.collect()}
-
-    # note: None values handled in preprocessing so should stay None here
-    assert set(rows.keys()) == {10.0, 20.0, None}
-
-
 def test_get_features(spark_fixture):
     data = spark_fixture.createDataFrame(
         [
@@ -365,9 +294,7 @@ def test_get_features(spark_fixture):
         "income_per_neighbor",
         "days_since_2009",
         "sin_day",
-        "cos_day",
-        "z_income",
-        "z_income_by_year"
+        "cos_day"
     }
 
     assert expected_cols.issubset(set(out.columns))

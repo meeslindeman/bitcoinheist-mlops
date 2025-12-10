@@ -6,8 +6,7 @@ const statusPrediction = document.getElementById("statusPrediction");
 const statusPredictionLabel = document.getElementById("statusPredictionLabel");
 const statusProbability = document.getElementById("statusProbability");
 
-// Example payloads matching your curl commands
-const exampleHeist = {
+const exampleClean = {
   year: 2014,
   day: 150,
   length: 5,
@@ -18,7 +17,7 @@ const exampleHeist = {
   income: 0.003,
 };
 
-const exampleClean = {
+const exampleHeist = {
   year: 2013,
   day: 45,
   length: 1,
@@ -109,6 +108,5 @@ function clearStatus() {
   statusProbability.textContent = "";
 }
 
-// Preload clean example on first load
 requestInput.value = JSON.stringify(exampleClean, null, 2);
 clearStatus();

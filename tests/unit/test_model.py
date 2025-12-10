@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import pytest
 
-from src.model import Model
+from src.model.model import Model
 
 
 @pytest.fixture
@@ -61,11 +61,9 @@ def test_predict(sample_data):
     model.train_model(sample_data)
 
     X = sample_data.drop(columns=["is_ransomware"]).iloc[:5]
-    predictions = model.predict(X)
     probabilities = model.predict_proba(X)
 
-    assert isinstance(predictions, np.ndarray)
-    assert predictions.shape[0] == 5
-
     assert isinstance(probabilities, np.ndarray)
+    assert probabilities.all() >= 0.0
+    assert probabilities.all() <= 1.0
     assert probabilities.shape == (5, 2)

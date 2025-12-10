@@ -1,7 +1,7 @@
 import pandas as pd
 
 from configs.configs import PathsConfig
-from src.spark_utils import get_spark_session
+from src.utils.spark_utils import get_spark_session
 
 def csv_to_parquet() -> None:
     raw_csv = pd.read_csv(PathsConfig.raw_csv_path)

@@ -7,7 +7,7 @@ from sklearn.metrics import classification_report, roc_auc_score, accuracy_score
 from sklearn.model_selection import cross_validate, train_test_split
 
 from configs.configs import ModelConfig, RunConfig
-from src.mlflow_utils import log_model_to_mlflow, load_model_from_mlflow
+from src.utils.mlflow_utils import log_model_to_mlflow, load_model_from_mlflow
 
 
 class Model:
@@ -132,10 +132,6 @@ class Model:
     def load_model_from_mlflow(self, run_id: str) -> None:
         model = load_model_from_mlflow(run_id=run_id)
         self._model = model
-
-    def predict(self, features: pd.DataFrame) -> np.ndarray:
-        self._ensure_trained()
-        return self._model.predict(features)
 
     def predict_proba(self, features: pd.DataFrame) -> np.ndarray:
         self._ensure_trained()

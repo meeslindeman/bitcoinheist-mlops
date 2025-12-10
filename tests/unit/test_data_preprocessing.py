@@ -1,7 +1,7 @@
 from pyspark.testing.utils import assertDataFrameEqual
 import pyspark.sql.functions as F
 
-from src.data_preprocessing import data_preprocessing
+from src.pipeline.data_preprocessing import data_preprocessing
 
 def test_data_preprocessing(spark_fixture):
     # note: should be 3 ransom and 3 white after balancing

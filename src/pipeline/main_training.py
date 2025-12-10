@@ -1,19 +1,12 @@
 import json
 import click
 
-from configs.configs import (
-    PathsConfig,
-    RunConfig,
-    TelemetryConfig
-)
-from src.spark_utils import (
-    read_raw_data,
-    write_data,
-    read_data,
-)
-from src.data_preprocessing import data_preprocessing
-from src.features import get_features
-from src.model import Model
+from configs.configs import PathsConfig, RunConfig, TelemetryConfig
+from utils.spark_utils import read_raw_data, write_data, read_data
+from src.pipeline.data_preprocessing import data_preprocessing
+from src.pipeline.features import get_features
+from src.pipeline.feature_extractor import FeatureExtractor
+from src.model.model import Model
 from src.telemetry.training import push_training_summary
 from src.telemetry.training_data import save_training_distribution
 
@@ -32,12 +25,28 @@ def main(preprocess: bool, feat_eng: bool, training: bool):
         print(f"[preprocess] Wrote preprocessed data to: {PathsConfig.preprocessed_data_path}")
 
     if feat_eng:
-        # note: preprocessed parquet to features parquet
+        # note: stateless Spark feature engineering: log/ratio/temporal
         preprocessed_data = read_data(path=PathsConfig.preprocessed_data_path)
         features_data = get_features(preprocessed_data)
 
+        # note: stateful feature extraction: z-score normalization
+        extractor = FeatureExtractor()
+        features_data = extractor.get_features(features_data)
+
+        # note: drop unused columns
+        drop_cols = ["year", "income", "length"]
+        existing_drop_cols = [c for c in drop_cols if c in features_data.columns]
+        if existing_drop_cols:
+            features_data = features_data.drop(*existing_drop_cols)
+
+        # note: save engineered features to parquet
         write_data(features_data, path=PathsConfig.features_data_path, mode="overwrite")
         print(f"[feat-eng] Wrote features data to: {PathsConfig.features_data_path}")
+
+        # note: save the z-score state so we can reuse it for inference
+        extractor.save_state(PathsConfig.feature_extractor_state_dir)
+        print(f"[feat-eng] Saved FeatureExtractor state to: {PathsConfig.feature_extractor_state_dir}")
+
 
     if training:
         features_spark = read_data(path=PathsConfig.features_data_path)

@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-import src.mlflow_utils as mlflow_utils
+import src.utils.mlflow_utils as mlflow_utils
 from configs.configs import ModelConfig, RunConfig
 
 

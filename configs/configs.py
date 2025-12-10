@@ -15,12 +15,13 @@ class PathsConfig:
     model_file_path: str = str(Path(model_path) / "BitcoinHeist.pkl") 
     feature_columns_path: str = str(Path(model_path) / "feature_columns.json")
 
+    feature_extractor_state_dir: str = str(Path(model_path) / "feature_extractor_state")
+
 
 class TelemetryConfig:
     # note: presumably most important features to monitor for data drift
     monitored_features = ["income", "neighbors", "weight"]  
     epsilon = 1e-6
-    num_instances_for_live_dist = 10
 
     # note: paths to store data distributions
     telemetry_training_data_dist_path = str(PROJECT_ROOT / "telemetry" / "data_dist.json")

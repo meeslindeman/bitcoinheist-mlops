@@ -4,7 +4,7 @@ from datetime import datetime
 import numpy as np
 
 from configs.configs import PathsConfig, TelemetryConfig
-from src.spark_utils import read_data
+from src.utils.spark_utils import read_data
 
 
 # note: generate mocked "live" telemetry data based on preprocessed data

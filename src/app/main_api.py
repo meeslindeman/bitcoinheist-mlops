@@ -7,16 +7,12 @@ from functools import cache
 from prometheus_flask_exporter import PrometheusMetrics
 
 from configs.configs import PathsConfig, RunConfig, ModelConfig
-from src.features import get_features
-from src.model import Model
-from src.spark_utils import get_spark_session
-from src.mlflow_utils import get_latest_run_id
-from src.telemetry.api import (
-    PREDICTION_REQUESTS,
-    PREDICTION_ERRORS,
-    PREDICTION_LATENCY,
-    PREDICTION_LABELS
-)
+from src.pipeline.features import get_features
+from src.pipeline.feature_extractor import FeatureExtractor
+from src.model.model import Model
+from src.utils.spark_utils import get_spark_session
+from src.utils.mlflow_utils import get_latest_run_id
+from src.telemetry.api import PREDICTION_REQUESTS, PREDICTION_ERRORS, PREDICTION_LATENCY, PREDICTION_LABELS
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
 metrics = PrometheusMetrics(app, defaults_prefix="bitcoin_heist")
@@ -43,6 +39,12 @@ try:
 except FileNotFoundError:
     app.logger.warning("Feature columns file not found at startup, run the training pipeline before requesting predictions.")
     FEATURE_COLUMNS = None
+
+try:
+    FEATURE_EXTRACTOR = FeatureExtractor.load_state(PathsConfig.feature_extractor_state_dir)
+except FileNotFoundError:
+    app.logger.warning("Feature extractor state not found at startup, run the feature engineering step before requesting predictions.")
+    FEATURE_EXTRACTOR = None
 
 @app.get("/health")
 def health():
@@ -83,10 +85,17 @@ def predict():
             PREDICTION_ERRORS.inc()
             return jsonify({"error": "No trained model available yet."}), 503
         
+        # note: feature columns available
         if FEATURE_COLUMNS is None:
             app.logger.warning("Prediction request but feature columns are not available.")
             PREDICTION_ERRORS.inc()
             return jsonify({"error": "Model features not initialized yet."}), 503
+        
+        # note: feature extractor available
+        if FEATURE_EXTRACTOR is None:
+            app.logger.warning("Prediction request but z-score feature extractor is not available.")
+            PREDICTION_ERRORS.inc()
+            return jsonify({"error": "Feature extractor not initialized yet."}), 503
 
         # note: validate prediction input
         # note: silent=True so we return None for invalid JSON and handle it ourselves
@@ -107,18 +116,29 @@ def predict():
         if "address" in input_pd.columns:
             input_pd = input_pd.drop(columns=["address"])
 
-        # note: extract features 
+        # note: stateless Spark feature engineering: log/ratio/temporal
         input_spark = get_spark().createDataFrame(input_pd)
         features_spark = get_features(input_spark)
+
+        # note: stateful feature extraction: z-score normalization
+        features_spark = FEATURE_EXTRACTOR.get_features(features_spark)
+
+        # note: drop raw columns that the model was not trained on
+        drop_cols = ["year", "income", "length"]
+        existing_drop_cols = [c for c in drop_cols if c in features_spark.columns]
+        if existing_drop_cols:
+            features_spark = features_spark.drop(*existing_drop_cols)
+
         features_pd = features_spark.toPandas()
 
+        # note: drop target column if present to be safe
         if "is_ransomware" in features_pd.columns:
             features_pd = features_pd.drop(columns=["is_ransomware"])
 
+        # note: align to training feature columns: add missing and reorder
         for col in FEATURE_COLUMNS:
             if col not in features_pd.columns:
                 features_pd[col] = 0.0
-
         features_pd = features_pd[FEATURE_COLUMNS]
 
         # note: make prediction
@@ -127,15 +147,11 @@ def predict():
 
         PREDICTION_LABELS.labels(prediction=prediction).inc()
 
-        return (
-            jsonify({"prediction": prediction, "probability": proba}),
-            200,
-        )
+        return (jsonify({"prediction": prediction, "probability": proba}), 200)
 
     except Exception as e:
         app.logger.exception("Unhandled error during prediction")
         PREDICTION_ERRORS.inc()
-        # Let Flask return 500 with message (or hide message if you prefer)
         return jsonify({"error": "Internal server error"}), 500
 
     finally:

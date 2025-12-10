@@ -1,11 +1,9 @@
 from typing import List
 import numpy as np
-import logging
 
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 
-logger = logging.getLogger(__name__)
 
 def get_log_transformed_features(data: DataFrame, features: List[str]) -> DataFrame:
     for feature in features:
@@ -58,53 +56,8 @@ def get_temporal_features(data: DataFrame) -> DataFrame:
     return data
 
 
-def _get_z_score(data: DataFrame, value_col: str, group_by_cols: List[str] | None = None) -> DataFrame:
-    group_by_cols = group_by_cols or []
-
-    stats = (data.groupBy(group_by_cols) if group_by_cols else data.groupBy()).agg(
-        F.mean(value_col).alias("mean"),
-        F.stddev(value_col).alias("std"),
-    )
-
-    if group_by_cols:
-        data = data.join(stats, on=group_by_cols)
-    else:
-        # note: cross join to attach same mean/std to all rows
-        data = data.crossJoin(stats)
-
-    if group_by_cols:
-        z_col_name = f"z_{value_col}_by_{'_'.join(group_by_cols)}"
-    else:
-        z_col_name = f"z_{value_col}"
-
-    z_score_raw = (F.col(value_col) - F.col("mean")) / F.col("std")
-
-    data = data.withColumn(
-        z_col_name,
-        F.when(F.col("std").isNull() | (F.col("std") == 0), F.lit(0.0))
-        .otherwise(z_score_raw)
-    )
-
-    data = data.drop("mean", "std")
-    return data
-
-
 def get_features(data: DataFrame) -> DataFrame:
-    data = get_log_transformed_features(
-        data, 
-        ['income', 'weight', 'count', 'looped']
-    )
+    data = get_log_transformed_features(data, ['income', 'weight', 'count', 'looped'])
     data = get_ratio_features(data)
-
-    # note: here we do z-score on income globally and within each year
-    data = _get_z_score(data, value_col="income")
-    data = _get_z_score(data, value_col="income", group_by_cols=["year"])
-
     data = get_temporal_features(data)
-
-    # note: drop original columns that are not needed anymore
-    drop_cols = ["year", "income", "length"]
-    data = data.drop(*drop_cols)
-
-    logger.info("Final feature set columns: %s", data.columns)
     return data
