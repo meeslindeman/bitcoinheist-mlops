@@ -20,7 +20,6 @@ def log_model_to_mlflow(model: BaseEstimator, cv_scores: dict, test_report: Opti
         mlflow.log_dict(cv_scores, "cv_scores.json")
         if "test_f1" in cv_scores:
             mlflow.log_metric("cv_test_f1_mean", cv_scores["test_f1"].mean())
-            mlflow.log_metric("cv_test_f1_std", cv_scores["test_f1"].std())
         if "test_precision" in cv_scores:
             mlflow.log_metric("cv_test_precision_mean", cv_scores["test_precision"].mean())
         if "test_recall" in cv_scores:
