@@ -29,17 +29,21 @@ This file is consumed by the initialization step (`csv_to_parquet`) to produce t
 
 Offline (Batch) Pipeline
 1. Parquet initialization
+   
     Convert raw CSV → Parquet (`scripts/csv_to_parquet.py`).
 2. Distributed preprocessing (PySpark)
+   
     Cleans data, enforces schema.
 3. Feature engineering
+   
     Log transforms, ratios, z-scores, categorical cleanup.
 4. Model training
+   
     MLflow-tracked experiment, persisted model artefacts in models/.
 5. Airflow DAG (`training_dag.py`) orchestrates the full batch pipeline.
 
 Online (HTTP API)
-- Fast inference endpoint (`/predict`) served via Flask in its own container.
+- Fast inference endpoint (`/predict`) served via Flask.
 - Loads same model artefacts as training stage.
 - Logs inference telemetry to local volume (Prometheus-scrapable format).
 
@@ -69,6 +73,7 @@ Ensures:
 Note: everything runs in the background.
 
 1. Run all unit tests
+   
 Note: make sure `requirements.txt` is also installed in your local machine (via virtual environment).
 ```bash
 make test
@@ -80,6 +85,7 @@ make up
 ```
 
 3. Trigger the Airflow training pipeline
+   
 Open Airflow UI (http://localhost:4242/dags) and trigger `bitcoin-heist-training`.
 
 Training performs:
@@ -91,22 +97,23 @@ Training performs:
 make drift
 ```
 This generates `telemetry/live_data_dist.json` by sampling from the features parquet.
-A psi monitor then reads `data_dist.json` and `live_data_dist.json`, computes PSI + missing ratio + mean + std per feature, and pushes metrics to Pushgateway.
+A PSI monitor then reads `data_dist.json` and `live_data_dist.json`, computes PSI + missing ratio + mean + std per tracked feature, and pushes metrics to Pushgateway.
 
-4. Run integration tests
+5. Run integration tests
 ```bash
 make test-integration
 ```
 
-5. Use the live API interface
+6. Use the live API interface
+   
 Open http://localhost:5001/ and submit values to receive prediction.
 
-6. Shutdown system
+7. Shutdown system
 ```bash
 make down
 ```
 
-7. (Optional) Track logging
+8. (Optional) Track logging
 ```bash
 make logs-app
 ```
