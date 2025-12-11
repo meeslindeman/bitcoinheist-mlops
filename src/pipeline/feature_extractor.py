@@ -1,6 +1,6 @@
 import pickle
 from pathlib import Path
-from typing import Dict, Optional, Any
+from typing import Dict, Optional
 
 from pyspark.sql import DataFrame, SparkSession
 import pyspark.sql.functions as F
@@ -74,8 +74,7 @@ class FeatureExtractor:
             data.select(
                 F.mean(F.col("income")).alias("mean"),
                 F.stddev_pop(F.col("income")).alias("std"),
-            )
-            .collect()[0]
+            ).collect()[0]
         )
 
         global_mean = float(global_stats["mean"])
@@ -88,20 +87,19 @@ class FeatureExtractor:
             .agg(
                 F.mean(F.col("income")).alias("mean"),
                 F.stddev_pop(F.col("income")).alias("std"),
-            )
-            .collect()
+            ).collect()
         )
 
         mean_by_year: Dict[int, float] = {}
         std_by_year: Dict[int, float] = {}
         for row in by_year_stats:
             year = int(row["year"])
-            m = float(row["mean"])
-            s = float(row["std"]) if row["std"] is not None else 0.0
-            if s == 0.0:
-                s = 1.0
-            mean_by_year[year] = m
-            std_by_year[year] = s
+            mean = float(row["mean"])
+            std = float(row["std"]) if row["std"] is not None else 0.0
+            if std == 0.0:
+                std = 1.0
+            mean_by_year[year] = mean
+            std_by_year[year] = std
 
         self._state.global_mean = global_mean
         self._state.global_std = global_std
@@ -110,12 +108,9 @@ class FeatureExtractor:
 
     def _add_zscore_columns(self, data: DataFrame) -> DataFrame:
         if not self._state.is_set():
-            raise RuntimeError("Z-score state is not set; cannot compute z-scores.")
+            raise RuntimeError("Z-score state is not set, cannot compute z-scores.")
 
-        data = data.withColumn(
-            "income_z",
-            (F.col("income") - F.lit(self._state.global_mean)) / F.lit(self._state.global_std),
-        )
+        data = data.withColumn("income_z", (F.col("income") - F.lit(self._state.global_mean)) / F.lit(self._state.global_std))
 
         spark = SparkSession.builder.getOrCreate()
 
@@ -130,7 +125,7 @@ class FeatureExtractor:
 
         data = data.withColumn(
             "income_z_by_year",
-            (F.col("income") - F.col("income_mean_year")) / F.col("income_std_year"),
+            (F.col("income") - F.col("income_mean_year")) / F.col("income_std_year")
         )
         data = data.drop("income_mean_year", "income_std_year")
 

@@ -14,6 +14,7 @@ from src.utils.spark_utils import get_spark_session
 from src.utils.mlflow_utils import get_latest_run_id
 from src.telemetry.api import PREDICTION_REQUESTS, PREDICTION_ERRORS, PREDICTION_LATENCY, PREDICTION_LABELS
 
+
 app = Flask(__name__, template_folder="templates", static_folder="static")
 metrics = PrometheusMetrics(app, defaults_prefix="bitcoin_heist")
 metrics.info(

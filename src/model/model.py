@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import logging
 
 from typing import Tuple
 from sklearn.ensemble import RandomForestClassifier
@@ -8,6 +9,9 @@ from sklearn.model_selection import cross_validate, train_test_split
 
 from configs.configs import ModelConfig, RunConfig
 from src.utils.mlflow_utils import log_model_to_mlflow, load_model_from_mlflow
+
+
+logger = logging.getLogger(__name__)    
 
 
 class Model:
@@ -79,9 +83,9 @@ class Model:
     
     def evaluate_model(self, data: pd.DataFrame | None = None) -> None:
         if self._test_report is not None and self._test_roc_auc is not None:
-            print("Classification report (test set):")
-            print(pd.DataFrame(self._test_report).T.to_string())
-            print(f"\nROC AUC Score (test set): {self._test_roc_auc:.6f}")
+            logger.info("Classification report (test set):")
+            logger.info(pd.DataFrame(self._test_report).T.to_string())
+            logger.info(f"\nROC AUC Score (test set): {self._test_roc_auc:.6f}")
             return
 
         if data is None:
@@ -92,8 +96,8 @@ class Model:
         y_pred = self._model.predict(X_test)
         y_proba = self._model.predict_proba(X_test)[:, 1]
 
-        print(classification_report(y_test, y_pred))
-        print(f"ROC AUC Score: {roc_auc_score(y_test, y_proba)}")
+        logger.info(classification_report(y_test, y_pred))
+        logger.info(f"ROC AUC Score: {roc_auc_score(y_test, y_proba)}")
 
     def get_test_summary(self) -> dict:
         if self._test_report is None or self._test_roc_auc is None:

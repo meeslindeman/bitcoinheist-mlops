@@ -1,7 +1,6 @@
 # BitcoinHeist ML Pipeline (Course Project)
 
 A compact reference for running and developing the BitcoinHeist end-to-end ML pipeline.  
-Features: reproducible PySpark preprocessing, MySQL-backed storage, Dockerized execution, and classical ML modeling.
 
 ---
 

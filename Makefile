@@ -1,12 +1,9 @@
-.PHONY: test format build build-nocache up drift down clean logs-app test-integration
+.PHONY: test build build-nocache up drift test-integration down clean enter-app logs-app 
 
 # note: unit tests and coverage for src/ only (local tests)
 test:
 	coverage run -m pytest -v tests/unit -p no:warnings .
 	coverage report --rcfile=.coveragerc
-
-format:
-	ruff format . --line-length 120
 
 build:
 	docker build . -t bitcoinheist-app -f infra/build/Dockerfile
@@ -21,19 +18,24 @@ up: build
 
 drift:
 	docker compose --file infra/docker-compose.yaml exec app \
-		sh -c "python -m src.telemetry.mock_live_data && python -m src.telemetry.psi_monitor"
+		sh -c "python -m src.telemetry.mock_live_data && python -m src.telemetry.drift_calculation"
+
+# note: integration tests run inside the app container
+test-integration:
+	docker compose --file infra/docker-compose.yaml exec app pytest -v tests/integration -p no:warnings
 
 down:
 	docker compose --file infra/docker-compose.yaml down
 
+# note: usefull commands
 clean:
 	docker compose --file infra/docker-compose.yaml down -v
 
 logs-app:
 	docker compose --file infra/docker-compose.yaml logs -f app
 
-# note: integration tests run inside the app container
-test-integration:
-	docker compose --file infra/docker-compose.yaml exec app pytest -v tests/integration -p no:warnings
+enter-app:
+	docker compose --file infra/docker-compose.yaml exec app sh
+
 
 

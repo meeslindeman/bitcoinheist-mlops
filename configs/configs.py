@@ -21,7 +21,6 @@ class PathsConfig:
 class TelemetryConfig:
     # note: presumably most important features to monitor for data drift
     monitored_features = ["income", "neighbors", "weight"]  
-    epsilon = 1e-6
 
     # note: paths to store data distributions
     telemetry_training_data_dist_path = str(PROJECT_ROOT / "telemetry" / "data_dist.json")

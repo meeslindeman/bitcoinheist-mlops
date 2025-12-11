@@ -18,12 +18,6 @@ dag = DAG(
     default_args=default_args
 )
 
-log_datetime_start_task = BashOperator(
-    task_id="log_datetime_start", 
-    bash_command="date", 
-    dag=dag
-)
-
 mounts = [
     Mount(source="bitcoin-heist-data", target="/bitcoinheist-app/data", type="volume"),
     Mount(source="bitcoin-heist-models", target="/bitcoinheist-app/models", type="volume"),
@@ -76,18 +70,10 @@ reload_task = BashOperator(
     dag=dag
 )
 
-log_datetime_end_task = BashOperator(
-    task_id="log_datetime_end", 
-    bash_command="date", 
-    dag=dag
-)
-
 (
-    log_datetime_start_task
-    >> init_parquet_task
+    init_parquet_task
     >> preprocessing_task
     >> feat_eng_task
     >> model_training_task
     >> reload_task
-    >> log_datetime_end_task
 )

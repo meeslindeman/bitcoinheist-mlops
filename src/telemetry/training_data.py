@@ -6,12 +6,26 @@ from typing import Dict, List
 from configs.configs import TelemetryConfig
 
 
-def calculate_feature_distribution(data: pd.DataFrame, features: List[str], num_bins: int = 10) -> Dict[str, Dict[str, List[float]]]:
+# note: calculate number of bins using Doane's formula (https://www.nannyml.com/blog/population-stability-index-psi)
+def doanes_formula(data: np.array) -> int:
+    # note: need at least 3 data points to compute skewness
+    if len(data) < 3:
+        return 1
+    
+    skewness = pd.Series(data).skew()
+
+    # note: see https://en.wikipedia.org/wiki/Sturges%27s_rule
+    sigma_g1 = np.sqrt((6 * (len(data) - 2)) / ((len(data) + 1) * (len(data) + 3)))
+    num_bins = 1 + np.log2(len(data)) + np.log2(1 + abs(skewness) / sigma_g1)
+
+    return max(1, int(round(num_bins)))
+
+
+def calculate_feature_distribution(data: pd.DataFrame, features: List[str]) -> Dict[str, Dict]:
     dist = {}
 
     for feature in features:
         series = data[feature]
-
         missing_ratio = float(series.isna().mean())
         non_missing = series.dropna()
 
@@ -26,6 +40,8 @@ def calculate_feature_distribution(data: pd.DataFrame, features: List[str], num_
             }
             continue
 
+        # note: determine number of bins using Doane's formula
+        num_bins = doanes_formula(non_missing.to_numpy())
         counts, bin_edges = np.histogram(non_missing, bins=num_bins)
 
         dist[feature] = {
@@ -34,6 +50,7 @@ def calculate_feature_distribution(data: pd.DataFrame, features: List[str], num_
             "std": float(non_missing.std()),
             "hist": counts.tolist(),
             "bin_edges": bin_edges.tolist(),
+            "num_bins": num_bins
         }
 
     return dist
