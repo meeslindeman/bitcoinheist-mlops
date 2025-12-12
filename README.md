@@ -6,13 +6,18 @@ A compact reference for running and developing the BitcoinHeist end-to-end ML pi
 
 ## Data Prep
 
-The system requires the raw BitcoinHeist dataset (CSV format) from the UCI Machine Learning Repository:
+The system requires the raw BitcoinHeist dataset (CSV format) from the [UCI Machine Learning Repository](https://archive.ics.uci.edu/dataset/526/bitcoinheistransomwareaddressdataset).
 
-Download: https://archive.ics.uci.edu/dataset/526/bitcoinheistransomwareaddressdataset
+Run the following commands to get the dataset:
+```bash
+wget -O data/bitcoinheist.zip https://archive.ics.uci.edu/static/public/526/bitcoinheistransomwareaddressdataset.zip
 
-Place the file at: `data/BitcoinHeistData.csv`.
+unzip data/bitcoinheist.zip -d data
 
-This file is consumed by the initialization step (`csv_to_parquet`) to produce the Parquet dataset used throughout preprocessing, feature engineering, and training.
+rm ./data/bitcoinheist.zip
+```
+
+Make sure the file is now stored at `data/BitcoinHeistData.csv`. This file is consumed by the initialization step (`csv_to_parquet`) to produce the Parquet dataset used throughout preprocessing, feature engineering, and training.
 
 ## Dataset Feature Notes
 
@@ -39,13 +44,13 @@ Offline (Batch) Pipeline
     Log transforms, ratios, z-scores, categorical cleanup.
 4. Model training
    
-    MLflow-tracked experiment, persisted model artefacts in models/.
+    MLflow-tracked experiment.
 5. Airflow DAG (`training_dag.py`) orchestrates the full batch pipeline.
 
 Online (HTTP API)
 - Fast inference endpoint (`/predict`) served via Flask.
 - Loads same model artefacts as training stage.
-- Logs inference telemetry to local volume (Prometheus-scrapable format).
+- Logs inference telemetry to local volume (Prometheus).
 
 ## Test Coverage
 
@@ -96,8 +101,9 @@ Training performs:
 ```bash
 make drift
 ```
+
 This generates `telemetry/live_data_dist.json` by sampling from the features parquet.
-A PSI monitor then reads `data_dist.json` and `live_data_dist.json`, computes PSI + missing ratio + mean + std per tracked feature, and pushes metrics to Pushgateway.
+A PSI monitor then reads `data_dist.json` and `live_data_dist.json`, computes PSI + missing ratio + mean + std per tracked feature, and pushes metrics to Prometheus via Pushgateway.
 
 5. Run integration tests
 ```bash
@@ -108,12 +114,18 @@ make test-integration
    
 Open http://localhost:5001/ and submit values to receive prediction.
 
-7. Shutdown system
+7. Check out Grafana dashboard 
+
+Open http://localhost:3000/ and login with default credentials (local development only):
+- **Username:** admin  
+- **Password:** admin
+
+8. Shutdown system
 ```bash
 make down
 ```
 
-8. (Optional) Track logging
+9. (Optional) Track logging
 ```bash
 make logs-app
 ```
@@ -121,5 +133,5 @@ make logs-app
 ## References
 
 - Dataset (UCI): https://archive.ics.uci.edu/dataset/526/bitcoinheistransomwareaddressdataset  
-- Paper (feature definitions and analysis): https://arxiv.org/pdf/1906.07852  
-- External GitHub implementation: https://github.com/toji-ut/BitcoinHeistRansomwareAnalytics  
+- Paper (feature definitions and further background): https://arxiv.org/pdf/1906.07852  
+- External GitHub implementation (referenced for preprocessing): https://github.com/toji-ut/BitcoinHeistRansomwareAnalytics  

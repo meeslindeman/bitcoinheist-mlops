@@ -2,6 +2,7 @@ from pyspark.sql import SparkSession, DataFrame
 from configs.configs import PathsConfig
 
 
+# note: helper to create a Spark session with a given application name
 def get_spark_session(app_name: str, master: str = "local[2]") -> SparkSession:
     return (
         SparkSession.builder

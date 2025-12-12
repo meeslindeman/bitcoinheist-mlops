@@ -36,16 +36,16 @@ def get_spark():
 
 try:
     with open(PathsConfig.feature_columns_path, "r") as f:
-        FEATURE_COLUMNS = json.load(f)
+        feature_columns = json.load(f)
 except FileNotFoundError:
     app.logger.warning("Feature columns file not found at startup, run the training pipeline before requesting predictions.")
-    FEATURE_COLUMNS = None
+    feature_columns = None
 
 try:
-    FEATURE_EXTRACTOR = FeatureExtractor.load_state(PathsConfig.feature_extractor_state_dir)
+    feature_extractor = FeatureExtractor.load_state(PathsConfig.feature_extractor_state_dir)
 except FileNotFoundError:
     app.logger.warning("Feature extractor state not found at startup, run the feature engineering step before requesting predictions.")
-    FEATURE_EXTRACTOR = None
+    feature_extractor = None
 
 @app.get("/health")
 def health():
@@ -87,13 +87,13 @@ def predict():
             return jsonify({"error": "No trained model available yet."}), 503
         
         # note: feature columns available
-        if FEATURE_COLUMNS is None:
+        if feature_columns is None:
             app.logger.warning("Prediction request but feature columns are not available.")
             PREDICTION_ERRORS.inc()
             return jsonify({"error": "Model features not initialized yet."}), 503
         
         # note: feature extractor available
-        if FEATURE_EXTRACTOR is None:
+        if feature_extractor is None:
             app.logger.warning("Prediction request but z-score feature extractor is not available.")
             PREDICTION_ERRORS.inc()
             return jsonify({"error": "Feature extractor not initialized yet."}), 503
@@ -122,7 +122,7 @@ def predict():
         features_spark = get_features(input_spark)
 
         # note: stateful feature extraction: z-score normalization
-        features_spark = FEATURE_EXTRACTOR.get_features(features_spark)
+        features_spark = feature_extractor.get_features(features_spark)
 
         # note: drop raw columns that the model was not trained on
         drop_cols = ["year", "income", "length"]
@@ -137,10 +137,10 @@ def predict():
             features_pd = features_pd.drop(columns=["is_ransomware"])
 
         # note: align to training feature columns: add missing and reorder
-        for col in FEATURE_COLUMNS:
+        for col in feature_columns:
             if col not in features_pd.columns:
                 features_pd[col] = 0.0
-        features_pd = features_pd[FEATURE_COLUMNS]
+        features_pd = features_pd[feature_columns]
 
         # note: make prediction
         proba = float(model.predict_proba(features_pd)[0, 1])

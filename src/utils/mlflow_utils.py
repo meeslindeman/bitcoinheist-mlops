@@ -18,6 +18,8 @@ def log_model_to_mlflow(model: BaseEstimator, cv_scores: dict, test_report: Opti
 
         # note: cross-validation scores
         mlflow.log_dict(cv_scores, "cv_scores.json")
+
+        # note: if CV score arrays/series are present, log their means as summary metrics
         if "test_f1" in cv_scores:
             mlflow.log_metric("cv_test_f1_mean", cv_scores["test_f1"].mean())
         if "test_precision" in cv_scores:
@@ -25,7 +27,7 @@ def log_model_to_mlflow(model: BaseEstimator, cv_scores: dict, test_report: Opti
         if "test_recall" in cv_scores:
             mlflow.log_metric("cv_test_recall_mean", cv_scores["test_recall"].mean())
 
-        # note: test metrics
+        # note: log test metrics
         if test_roc_auc is not None:
             mlflow.log_metric("test_roc_auc", float(test_roc_auc))
         if test_accuracy is not None:
@@ -33,6 +35,7 @@ def log_model_to_mlflow(model: BaseEstimator, cv_scores: dict, test_report: Opti
         if test_report is not None:
             mlflow.log_dict(test_report, "test_classification_report.json")
 
+        # note: persist the model to a temporary file and upload as an artifact
         model_file_name = f"{ModelConfig.model_name}.pkl"
 
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -51,6 +54,7 @@ def load_model_from_mlflow(run_id: str) -> BaseEstimator:
     if experiment is None:
         raise RuntimeError(f"Experiment {RunConfig.experiment_name} does not exist in MLflow.")
 
+    # note: download artifacts for the given run into a temporary directory
     with tempfile.TemporaryDirectory() as tmp_dir:
         mlflow.artifacts.download_artifacts(
             run_id=run_id,
@@ -65,6 +69,7 @@ def load_model_from_mlflow(run_id: str) -> BaseEstimator:
         if not os.path.exists(model_path):
             raise RuntimeError(f"Model file {model_file_name} not found under MLflow artifacts.")
 
+        # note: load and return the deserialized scikit-learn estimator
         with open(model_path, "rb") as f:
             model: BaseEstimator = pickle.load(f)
 
@@ -79,6 +84,7 @@ def get_latest_run_id(run_name: str) -> str:
         if mlflow_experiment is None:
             raise RuntimeError(f"Experiment {RunConfig.experiment_name} does not exist in MLflow.")
 
+        # note: query MLflow for runs with the requested run name
         runs = mlflow.search_runs(
             [mlflow_experiment.experiment_id],
             f"attributes.run_name = '{run_name}'"
@@ -87,6 +93,8 @@ def get_latest_run_id(run_name: str) -> str:
         if runs.empty:
             raise RuntimeError(f"Run with name {run_name} is not found in MLflow.")
 
+        # note: if there are unfinished runs (no end_time), prefer them
+        # note: otherwise use the most recently finished run.
         unfinished = runs[runs["end_time"].isna()]
         if len(unfinished) > 1:
             raise RuntimeError("MLflow has multiple unfinished runs.")
