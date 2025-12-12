@@ -25,6 +25,7 @@ def test_predict_invalid_input(client):
     data = resp.get_json()
     assert data["error"] == "Invalid or missing JSON body"
 
+
 # note: test the /predict endpoint with valid input and a mocked model
 def test_predict_success(client):
     input = {
@@ -45,6 +46,7 @@ def test_predict_success(client):
     assert "probability" in data
     assert data["prediction"] in {"ransomware", "clean"}
     assert 0.0 <= data["probability"] <= 1.0
+
 
 # note: test the /predict endpoint when input JSON is missing some features
 # note: should still work by filling in missing features with 0.0

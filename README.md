@@ -116,6 +116,8 @@ Open http://localhost:5001/ and submit values to receive prediction.
 
 7. Check out Grafana dashboard 
 
+Grafana dashboard is persisted via a bind mount to `infra/grafana/data`, which contains Grafana’s internal SQLite database (`grafana.db`).
+
 Open http://localhost:3000/ and login with default credentials (local development only):
 - **Username:** admin  
 - **Password:** admin

@@ -1,0 +1,6 @@
+route:
+  receiver: "default"
+
+# note: normally this would be email, slack, or something like that
+receivers:
+  - name: default

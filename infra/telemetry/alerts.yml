@@ -12,9 +12,9 @@ groups:
 
       - alert: HighErrorRate
         expr: |
-          rate(prediction_errors[5m])
+          rate(prediction_errors_total[0m])
           /
-          rate(prediction_requests[5m])
+          rate(prediction_requests_total[0m])
           > 0.05
         for: 5m
         labels:

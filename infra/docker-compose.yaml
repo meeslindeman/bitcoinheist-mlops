@@ -81,6 +81,16 @@ services:
       retries: 3
       interval: 5s
 
+  alertmanager:
+    image: prom/alertmanager
+    container_name: alertmanager
+    volumes:
+      - ./telemetry/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    command:
+      - "--config.file=/etc/alertmanager/alertmanager.yml"
+    ports:
+      - "9093:9093"
+
   grafana:
     image: grafana/grafana:latest
     ports:
@@ -99,11 +109,13 @@ services:
       timeout: 5s
       retries: 5
 
+# note: I use explicit volume names to prevent Docker Compose from auto-prefixing with the project name with infra_*
+# note: this ensures the same volumes are shared between docker-compose services and Airflow DockerOperator tasks.
 volumes:
   bitcoin-heist-data:
-    external: true
+    name: bitcoin-heist-data
   bitcoin-heist-models:
-    external: true
+    name: bitcoin-heist-models
   bitcoin-heist-telemetry:
-    external: true
+    name: bitcoin-heist-telemetry
   mlflow-data:

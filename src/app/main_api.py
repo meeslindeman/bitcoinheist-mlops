@@ -36,21 +36,18 @@ def get_spark():
         spark = get_spark_session(app_name="bitcoin-heist-api")
     return spark
 
-# note: the following blocks ensure that the app is ready to serve predictions
-try:
-    # note: load feature columns stored during training for prediction alignment
-    with open(PathsConfig.feature_columns_path, "r") as f:
-        feature_columns = json.load(f)
-except FileNotFoundError:
-    app.logger.warning("Feature columns file not found at startup, run the training pipeline before requesting predictions.")
-    feature_columns = None
 
-try:
-    # note: load the saved stateful feature extractor for prediction
-    feature_extractor = FeatureExtractor.load_state(PathsConfig.feature_extractor_state_dir)
-except FileNotFoundError:
-    app.logger.warning("Feature extractor state not found at startup, run the feature engineering step before requesting predictions.")
-    feature_extractor = None
+# note: cached artifact loaders
+# note: caches are cleared on /reload so the API can pick up newly trained artifacts without restart
+@cache
+def get_feature_columns() -> list[str]:
+    with open(PathsConfig.feature_columns_path, "r") as f:
+        return json.load(f)
+    
+
+@cache
+def get_feature_extractor() -> FeatureExtractor:
+    return FeatureExtractor.load_state(PathsConfig.feature_extractor_state_dir)
 
 
 @app.get("/health")
@@ -70,12 +67,18 @@ def get_model() -> Model:
     return model
 
 
+# note: reload all runtime artifacts (model + feature schema + stateful feature extractor) without restarting the container.
 @app.post("/reload")
 def reload_model():
     try:
         get_model.cache_clear()
-        # note: return value not needed, model will be cached on next get_model() call
+        get_feature_columns.cache_clear()
+        get_feature_extractor.cache_clear()
+        
         _ = get_model()
+        _ = get_feature_columns()
+        _ = get_feature_extractor()
+
         return jsonify({"status": "ok", "message": "Model reloaded from MLflow"}), 200
 
     except Exception as e:
@@ -99,14 +102,18 @@ def predict():
             return jsonify({"error": "No trained model available yet."}), 503
         
         # note: feature columns available
-        if feature_columns is None:
-            app.logger.warning("Prediction request but feature columns are not available.")
+        try:
+            feature_columns = get_feature_columns()
+        except FileNotFoundError as e:
+            app.logger.warning(f"Prediction request but feature columns are not available: {e}")
             PREDICTION_ERRORS.inc()
             return jsonify({"error": "Model features not initialized yet."}), 503
         
         # note: feature extractor available
-        if feature_extractor is None:
-            app.logger.warning("Prediction request but z-score feature extractor is not available.")
+        try:
+            feature_extractor = get_feature_extractor()
+        except FileNotFoundError as e:
+            app.logger.warning(f"Prediction request but feature extractor is not available: {e}")
             PREDICTION_ERRORS.inc()
             return jsonify({"error": "Feature extractor not initialized yet."}), 503
 

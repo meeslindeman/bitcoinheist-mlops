@@ -71,7 +71,7 @@ def main(preprocess: bool, feat_eng: bool, training: bool):
         model = Model()
         model.train_model(features_data)
 
-        logger.info(f"[Training] Trained model and saved to: {PathsConfig.trained_model_path}")
+        logger.info(f"[Training] Trained model and saved to: {PathsConfig.model_file_path}")
         logger.info(model.get_cv_scores())
 
         if RunConfig.evaluate_model:

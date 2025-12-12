@@ -14,7 +14,7 @@ build-nocache:
 # note: bring up full stack 
 up: build
 	docker compose --file infra/docker-compose.yaml down
-	docker compose --file infra/docker-compose.yaml up -d mlflow airflow prometheus pushgateway grafana app
+	docker compose --file infra/docker-compose.yaml up -d 
 
 drift:
 	docker compose --file infra/docker-compose.yaml exec app \

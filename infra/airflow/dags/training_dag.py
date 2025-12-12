@@ -30,6 +30,7 @@ init_parquet_task = DockerOperator(
     image="bitcoinheist-app:latest",
     command="python scripts/csv_to_parquet.py",
     network_mode="infra_default",
+    auto_remove="success",
     mounts=mounts,
     dag=dag
 )
@@ -40,6 +41,7 @@ preprocessing_task = DockerOperator(
     image="bitcoinheist-app:latest",
     command="python src/pipeline/main_training.py --preprocess",
     network_mode="infra_default",
+    auto_remove="success",
     mounts=mounts,
     dag=dag
 )
@@ -50,6 +52,7 @@ feat_eng_task = DockerOperator(
     image="bitcoinheist-app:latest",
     command="python src/pipeline/main_training.py --feat-eng",
     network_mode="infra_default",
+    auto_remove="success",
     mounts=mounts,
     dag=dag
 )
@@ -60,6 +63,7 @@ model_training_task = DockerOperator(
     image="bitcoinheist-app:latest",
     command="python src/pipeline/main_training.py --training",
     network_mode="infra_default",
+    auto_remove="success",
     mounts=mounts,
     dag=dag,
 )

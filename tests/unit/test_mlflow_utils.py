@@ -1,7 +1,7 @@
 import os
 import pickle
-
 import numpy as np
+import pandas as pd
 import pytest
 
 import src.utils.mlflow_utils as mlflow_utils
@@ -61,11 +61,12 @@ def test_log_model(monkeypatch):
 
     cv_scores = {
         "test_f1": np.array([0.1, 0.2]),
+        "test_precision": np.array([0.3, 0.4]),
+        "test_recall": np.array([0.5, 0.6]),
     }
-    fake_model = {"foo": "bar"}
-
+    
     run_id = mlflow_utils.log_model_to_mlflow(
-        model=fake_model,
+        model={"foo": "bar"},
         cv_scores=cv_scores,
         test_report={"dummy": 1},
         test_roc_auc=0.9,
@@ -73,15 +74,27 @@ def test_log_model(monkeypatch):
     )
 
     assert run_id == "dummy-run-id"
-    assert called["set_tracking_uri"]
-    assert called["set_experiment"]
     assert called["start_run"]
+
+    # note: dictionaries
     assert "cv_scores.json" in called["log_dict"]
     assert "test_classification_report.json" in called["log_dict"]
+
+    # note: CV summary metrics
+    assert "cv_test_f1_mean" in called["log_metric"]
+    assert "cv_test_precision_mean" in called["log_metric"]
+    assert "cv_test_recall_mean" in called["log_metric"]
+
+    # note: test metrics
+    assert "test_roc_auc" in called["log_metric"]
+    assert "test_accuracy" in called["log_metric"]
+
+    # note: artifact upload
     assert len(called["log_artifact"]) == 1
     logged_path, artifact_path = called["log_artifact"][0]
     assert artifact_path == RunConfig.run_name
     assert logged_path.endswith(f"{ModelConfig.model_name}.pkl")
+
 
 def test_load_model(monkeypatch):
     dummy_model = {"loaded": True}
@@ -109,6 +122,7 @@ def test_load_model(monkeypatch):
     model = mlflow_utils.load_model_from_mlflow(run_id="run-123")
     assert model == dummy_model
 
+
 def test_load_model_no_experiment(monkeypatch):
     def fake_set_tracking_uri(uri):
         pass
@@ -122,5 +136,22 @@ def test_load_model_no_experiment(monkeypatch):
     with pytest.raises(RuntimeError):
         mlflow_utils.load_model_from_mlflow(run_id="any")
 
-        
+
+def test_get_latest_run_id_no_experiment(monkeypatch):
+    monkeypatch.setattr(mlflow_utils.mlflow, "set_tracking_uri", lambda uri: None)
+    monkeypatch.setattr(mlflow_utils.mlflow, "get_experiment_by_name", lambda name: None)
+
+    with pytest.raises(RuntimeError, match="does not exist"):
+        mlflow_utils.get_latest_run_id(run_name="any")
     
+
+def test_get_latest_run_id_runs_empty(monkeypatch):
+    class FakeExperiment:
+        experiment_id = "exp123"
+
+    monkeypatch.setattr(mlflow_utils.mlflow, "set_tracking_uri", lambda uri: None)
+    monkeypatch.setattr(mlflow_utils.mlflow, "get_experiment_by_name", lambda name: FakeExperiment())
+    monkeypatch.setattr(mlflow_utils.mlflow, "search_runs", lambda *args, **kwargs: pd.DataFrame())
+
+    with pytest.raises(RuntimeError, match="is not found"):
+        mlflow_utils.get_latest_run_id(run_name="any")
