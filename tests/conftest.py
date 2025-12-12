@@ -1,10 +1,11 @@
 import pytest
-from pyspark.sql import SparkSession
+import src.app.main_api as main_api
 
 
-@pytest.fixture(scope="session")
-def spark_fixture():
-    spark = (SparkSession.builder.master("local[2]").appName("pytest-spark").getOrCreate())
-    yield spark
-    spark.stop()
+# note: reuse the spark session fixture in main_api to avoid creating multiple Spark sessions
+@pytest.fixture(autouse=True)
+def reuse_spark_session(spark_fixture):
+    main_api.spark = spark_fixture
+    yield
+    main_api.spark = None
 

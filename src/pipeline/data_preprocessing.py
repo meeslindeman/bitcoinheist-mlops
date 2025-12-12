@@ -25,9 +25,8 @@ def data_preprocessing(data: DataFrame) -> DataFrame:
     if white_count == 0:
         raise ValueError("No 'white' class instances found in the dataset.")
     
+    # note: downsample the majority class to balance the dataset
     white_df = (white_df.orderBy(F.rand(seed=RunConfig.random_seed)).limit(ransom_count))
-
-    # note: combine and shuffle
     data = ransom_df.unionByName(white_df)
 
     # note: assert balanced classes

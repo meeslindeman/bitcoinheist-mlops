@@ -20,7 +20,6 @@ logger = logging.getLogger(__name__)
 @click.option("--feat-eng", is_flag=True, help="Run feature engineering step (preprocessed → features).")
 @click.option("--training", is_flag=True, help="Run model training step (features → model + metrics).")
 
-
 def main(preprocess: bool, feat_eng: bool, training: bool):
     if preprocess:
         # note: raw csv to preprocessed parquet
@@ -38,8 +37,7 @@ def main(preprocess: bool, feat_eng: bool, training: bool):
         extractor = FeatureExtractor()
         features_data = extractor.get_features(features_data)
 
-        # note: drop unused columns
-        # note: engineered features work better
+        # note: drop unused columns, engineered features work better
         drop_cols = ["year", "income", "length"]
         existing_drop_cols = [c for c in drop_cols if c in features_data.columns]
         if existing_drop_cols:
@@ -55,13 +53,16 @@ def main(preprocess: bool, feat_eng: bool, training: bool):
 
     if training:
         features_spark = read_data(path=PathsConfig.features_data_path)
+        # note: convert to Pandas for model training
         features_data = features_spark.toPandas()
 
         # note: ensure target column exists
         if "is_ransomware" not in features_data.columns:
             raise ValueError("Column 'is_ransomware' not found in features data for training.")
 
-        # note: persist feature column order for inference
+        # note: ensures inference uses the same feature set and order as training
+        # note: mismatch in feature columns leads to incorrect model predictions or runtime errors
+        # note: more robust than hardcoding feature columns in \predict api
         feature_columns = [c for c in features_data.columns if c != "is_ransomware"]
         with open(PathsConfig.feature_columns_path, "w") as f:
             json.dump(feature_columns, f)

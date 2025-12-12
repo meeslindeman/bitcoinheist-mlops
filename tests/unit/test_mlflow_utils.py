@@ -2,7 +2,6 @@ import os
 import pickle
 
 import numpy as np
-import pandas as pd
 import pytest
 
 import src.utils.mlflow_utils as mlflow_utils

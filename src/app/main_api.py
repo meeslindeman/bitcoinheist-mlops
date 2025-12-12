@@ -25,16 +25,20 @@ metrics.info(
     model_name=ModelConfig.model_name,
 )
 
-# note: lazy import for testing purposes
+# note: lazy initialization for production correctness, importing main_api breaks if SparkContext is created too early
+# note: inject the session-scoped Spark fixture in tests so the API reuses the existing SparkContext and avoids double initialization
 spark = None
 
 def get_spark():
+    # note: one shared Spark session for the API
     global spark
     if spark is None:
         spark = get_spark_session(app_name="bitcoin-heist-api")
     return spark
 
+# note: the following blocks ensure that the app is ready to serve predictions
 try:
+    # note: load feature columns stored during training for prediction alignment
     with open(PathsConfig.feature_columns_path, "r") as f:
         feature_columns = json.load(f)
 except FileNotFoundError:
@@ -42,15 +46,19 @@ except FileNotFoundError:
     feature_columns = None
 
 try:
+    # note: load the saved stateful feature extractor for prediction
     feature_extractor = FeatureExtractor.load_state(PathsConfig.feature_extractor_state_dir)
 except FileNotFoundError:
     app.logger.warning("Feature extractor state not found at startup, run the feature engineering step before requesting predictions.")
     feature_extractor = None
 
+
 @app.get("/health")
 def health():
     return jsonify({"status": "ok"}), 200
 
+
+# note: cached model loader so all predictions reuse the same loaded model until /reload is called
 @cache
 def get_model() -> Model:
     run_id = get_latest_run_id(RunConfig.run_name)
@@ -61,10 +69,12 @@ def get_model() -> Model:
     model.load_model_from_mlflow(run_id)
     return model
 
+
 @app.post("/reload")
 def reload_model():
     try:
         get_model.cache_clear()
+        # note: return value not needed, model will be cached on next get_model() call
         _ = get_model()
         return jsonify({"status": "ok", "message": "Model reloaded from MLflow"}), 200
 
@@ -72,12 +82,14 @@ def reload_model():
         app.logger.exception("Failed to reload model from MLflow")
         return jsonify({"status": "error", "message": str(e)}), 500
 
+
 @app.post("/predict")
 def predict():
     start_time = time()
     PREDICTION_REQUESTS.inc()
 
     try:
+        # note: implement some 503 service unavailable errors for possible unready states
         # note: get model lazy + cached
         try:
             model = get_model()
@@ -102,16 +114,20 @@ def predict():
         # note: silent=True so we return None for invalid JSON and handle it ourselves
         data = request.get_json(silent=True) 
         if data is None:
+            # note: 400 bad request for invalid/missing JSON body
             PREDICTION_ERRORS.inc()
             return jsonify({"error": "Invalid or missing JSON body"}), 400
         
         # note: validate required fields
         required_fields = ["year", "day", "length", "weight", "count", "looped", "neighbors", "income"]
-        missing = [f for f in required_fields if f not in data]
+        missing = [field for field in required_fields if field not in data]
         if missing:
+            # note: 400 bad request for missing required fields
             PREDICTION_ERRORS.inc()
             return (jsonify({"error": "Missing required input fields", "missing_fields": missing}), 400)
 
+        # note: convert input to Pandas for easier manipulation
+        # note: this is a bit of a hack but avoids writing a full schema
         input_pd = pd.DataFrame([data])
 
         if "address" in input_pd.columns:
@@ -126,7 +142,7 @@ def predict():
 
         # note: drop raw columns that the model was not trained on
         drop_cols = ["year", "income", "length"]
-        existing_drop_cols = [c for c in drop_cols if c in features_spark.columns]
+        existing_drop_cols = [col for col in drop_cols if col in features_spark.columns]
         if existing_drop_cols:
             features_spark = features_spark.drop(*existing_drop_cols)
 
@@ -136,13 +152,13 @@ def predict():
         if "is_ransomware" in features_pd.columns:
             features_pd = features_pd.drop(columns=["is_ransomware"])
 
-        # note: align to training feature columns: add missing and reorder
+        # note: align to training feature columns, add missing and reorder
         for col in feature_columns:
             if col not in features_pd.columns:
                 features_pd[col] = 0.0
         features_pd = features_pd[feature_columns]
 
-        # note: make prediction
+        # note: make prediction using positive class probability
         proba = float(model.predict_proba(features_pd)[0, 1])
         prediction = "ransomware" if proba >= 0.5 else "clean"
 
@@ -155,9 +171,11 @@ def predict():
         PREDICTION_ERRORS.inc()
         return jsonify({"error": "Internal server error"}), 500
 
+    # note: always observe latency
     finally:
         runtime = time() - start_time
         PREDICTION_LATENCY.observe(runtime)
+
 
 # note: simple UI 
 @app.get("/")

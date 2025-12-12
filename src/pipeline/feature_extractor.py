@@ -5,6 +5,7 @@ from typing import Dict, Optional
 from pyspark.sql import DataFrame, SparkSession
 import pyspark.sql.functions as F
 
+
 class _FeatureData:
     def __init__(self) -> None:
         self.global_mean: Optional[float] = None
@@ -13,6 +14,7 @@ class _FeatureData:
         self.std_by_year: Dict[int, float] = {}
     
     def is_set(self) -> bool:
+        # note: check if all components are set (training completed)
         return (
             self.global_mean is not None
             and self.global_std is not None
@@ -24,6 +26,7 @@ class _FeatureData:
         directory = Path(directory)
         directory.mkdir(parents=True, exist_ok=True)
 
+        # note: save each component to a separate pickle file
         with (directory / "global_income_mean.pkl").open("wb") as f:
             pickle.dump(self.global_mean, f)
         with (directory / "global_income_std.pkl").open("wb") as f:
@@ -33,7 +36,7 @@ class _FeatureData:
         with (directory / "income_std_by_year.pkl").open("wb") as f:
             pickle.dump(self.std_by_year, f)
 
-    # note: load from file instead of mlflow
+    # note: construct new _FeatureData from saved files
     @classmethod
     def load(cls, directory: str | Path) -> "_FeatureData":
         directory = Path(directory)
@@ -52,6 +55,7 @@ class _FeatureData:
 
 class FeatureExtractor:
     def __init__(self, state: Optional[_FeatureData] = None) -> None:
+        # note: if state is passed, use it; otherwise initialize empty state
         self._state = state or _FeatureData()
 
     def get_features(self, data: DataFrame) -> DataFrame:
@@ -60,7 +64,6 @@ class FeatureExtractor:
         else:
             return self._get_features_training(data)
         
-    # note: training and inference
     def _get_features_training(self, data: DataFrame) -> DataFrame:
         self._fit_state_from_data(data)
         return self._add_zscore_columns(data)
@@ -68,25 +71,27 @@ class FeatureExtractor:
     def _get_features_inference(self, data: DataFrame) -> DataFrame:
         return self._add_zscore_columns(data)
     
-    # note: fit z-score state from training data
+    # note: fit z-score state from training data and store in self._state
     def _fit_state_from_data(self, data: DataFrame) -> None:
         global_stats = (
             data.select(
                 F.mean(F.col("income")).alias("mean"),
-                F.stddev_pop(F.col("income")).alias("std"),
-            ).collect()[0]
+                F.stddev_pop(F.col("income")).alias("std")
+            ).collect()[0] # note: single row result
         )
 
+        # note: extract global mean and std, handle zero std case
         global_mean = float(global_stats["mean"])
         global_std = float(global_stats["std"]) if global_stats["std"] is not None else 0.0
         if global_std == 0.0:
             global_std = 1.0 
 
+        # note: compute mean and std per year
         by_year_stats = (
             data.groupBy("year")
             .agg(
                 F.mean(F.col("income")).alias("mean"),
-                F.stddev_pop(F.col("income")).alias("std"),
+                F.stddev_pop(F.col("income")).alias("std")
             ).collect()
         )
 
@@ -101,25 +106,31 @@ class FeatureExtractor:
             mean_by_year[year] = mean
             std_by_year[year] = std
 
+        # note: store computed statistics in the state
         self._state.global_mean = global_mean
         self._state.global_std = global_std
         self._state.mean_by_year = mean_by_year
         self._state.std_by_year = std_by_year
 
+    # note: add z-score normalized columns to the data using fitted state
     def _add_zscore_columns(self, data: DataFrame) -> DataFrame:
         if not self._state.is_set():
             raise RuntimeError("Z-score state is not set, cannot compute z-scores.")
 
         data = data.withColumn("income_z", (F.col("income") - F.lit(self._state.global_mean)) / F.lit(self._state.global_std))
 
+        # note: session needed to create DataFrames from in-memory python data
         spark = SparkSession.builder.getOrCreate()
 
+        # note: convert mean/std by year dicts to python lists for DataFrame creation
         mean_rows = [(year, float(mean)) for year, mean in self._state.mean_by_year.items()]
         std_rows = [(year, float(std)) for year, std in self._state.std_by_year.items()]
 
+        # note: create DataFrames and join to get year-specific means/stds
         mean_df = spark.createDataFrame(mean_rows, schema=["year", "income_mean_year"])
         std_df = spark.createDataFrame(std_rows, schema=["year", "income_std_year"])
 
+        # note: join to get year-specific mean and std columns
         data = data.join(mean_df, on="year", how="left")
         data = data.join(std_df, on="year", how="left")
 
@@ -134,9 +145,11 @@ class FeatureExtractor:
     def save_state(self, directory: str | Path) -> None:
         if not self._state.is_set():
             raise RuntimeError("Cannot save FeatureExtractor state: not fitted yet.")
+        # note: delegate to _FeatureData save method
         self._state.save(directory)
 
     @classmethod
     def load_state(cls, directory: str | Path) -> "FeatureExtractor":
         state = _FeatureData.load(directory)
+        # note: construct FeatureExtractor with loaded state so inference can be run 
         return cls(state=state)

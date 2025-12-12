@@ -10,6 +10,7 @@ PREDICTION_ERRORS = Counter(
     "Total number of prediction errors"
 )
 
+# note: histograms for latency distribution
 PREDICTION_LATENCY = Histogram(
     "prediction_latency_seconds",
     "Latency of prediction requests in seconds"

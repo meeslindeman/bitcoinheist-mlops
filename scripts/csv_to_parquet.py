@@ -6,6 +6,7 @@ from src.utils.spark_utils import get_spark_session
 def csv_to_parquet() -> None:
     raw_csv = pd.read_csv(PathsConfig.raw_csv_path)
 
+    # note: drop unnamed index column if present
     if "Unnamed: 0" in raw_csv.columns:
         raw_csv = raw_csv.drop(columns=["Unnamed: 0"])
 

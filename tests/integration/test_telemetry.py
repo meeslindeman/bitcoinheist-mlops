@@ -2,6 +2,7 @@ import pytest
 
 from src.app.main_api import app
 
+
 @pytest.fixture
 def client():
     app.testing = True
