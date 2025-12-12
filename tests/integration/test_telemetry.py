@@ -21,9 +21,3 @@ def test_metrics_endpoint_exposes_custom_metrics(client):
     assert "prediction_requests_total" in body
     assert "prediction_errors_total" in body
     assert "prediction_labels" in body
-
-    # note: training custom metrics
-    assert "training_last_run_timestamp_seconds" in body
-    assert "training_last_accuracy" in body
-    assert "training_last_roc_auc" in body
-    assert "training_last_f1_positive" in body

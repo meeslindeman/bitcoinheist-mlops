@@ -13,8 +13,8 @@ build-nocache:
 
 # note: bring up full stack 
 up: build
-	docker compose --file infra/docker-compose.yaml down
-	docker compose --file infra/docker-compose.yaml up -d 
+	docker compose -f infra/docker-compose.yaml down
+	docker compose -f infra/docker-compose.yaml up -d --build --remove-orphans
 
 drift:
 	docker compose --file infra/docker-compose.yaml exec app \

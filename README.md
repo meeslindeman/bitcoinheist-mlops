@@ -1,10 +1,12 @@
 # BitcoinHeist ML Pipeline (Course Project)
 
-A compact reference for running and developing the BitcoinHeist end-to-end ML pipeline.  
+This repository implements a fully local, production-style ML system for detecting ransomware-related Bitcoin addresses using the BitcoinHeist dataset.  
+The project covers the complete MLOps lifecycle: data ingestion, distributed preprocessing, feature engineering, model training, experiment tracking, API serving, telemetry, monitoring, and testing.
+The system is designed to be containerized, and runnable end-to-end on a single machine without external services.
 
 ---
 
-## Data Prep
+## Dataset
 
 The system requires the raw BitcoinHeist dataset (CSV format) from the [UCI Machine Learning Repository](https://archive.ics.uci.edu/dataset/526/bitcoinheistransomwareaddressdataset).
 
@@ -21,6 +23,8 @@ Make sure the file is now stored at `data/BitcoinHeistData.csv`. This file is co
 
 ## Dataset Feature Notes
 
+Feature definitions are derived from the transaction graph structure around each Bitcoin address.
+
 | Feature | Definition | Usefullness |
 | ------- |----------- | ----------- |
 | **Income** | Satoshi amount (1 bitcoin = 100 million satoshis) | Captures payment magnitude — ransom payments cluster around specific BTC amounts. |
@@ -34,27 +38,64 @@ Make sure the file is now stored at `data/BitcoinHeistData.csv`. This file is co
 
 Offline (Batch) Pipeline
 1. Parquet initialization
-   
-    Convert raw CSV → Parquet (`scripts/csv_to_parquet.py`).
+    - Convert raw CSV → Parquet (`scripts/csv_to_parquet.py`).
 2. Distributed preprocessing (PySpark)
-   
-    Cleans data, enforces schema.
+    - Cleans invalid rows
+    - Enforces schema
+    - Normalizes raw fields
+    - Outputs preprocessed Parquet dataset
 3. Feature engineering
-   
-    Log transforms, ratios, z-scores, categorical cleanup.
+    - Log transforms
+    - Ratios and derived features
+    - Feature selection
+    - Outputs a features Parquet dataset and a JSON feature schema
 4. Model training
-   
-    MLflow-tracked experiment.
-5. Airflow DAG (`training_dag.py`) orchestrates the full batch pipeline.
+    - Scikit-learn `RandomForrest` Classifier
+    - Cross validation and evaluation
+    - Metrics and artifacts logged to MLflow
+5. Airflow Orchestration
+    - Ariflow DAG (`training_dag.py`) coordinates all batch stages
+    - Each stage is separate and overwrites its own Parquet output
 
-Online (HTTP API)
+Online (Serving) Pipeline
 - Fast inference endpoint (`/predict`) served via Flask.
 - Loads same model artefacts as training stage.
-- Logs inference telemetry to local volume (Prometheus).
+- Loads:
+    - Trained model
+    - Feature schema
+    - Preprocessing logic shared with training
+- Exposes Prometheus metrics for:
+    - Request count
+    - Error count
+    - Latency
+    - Prediction labels
+
+## Telemetry and Drift Monitoring
+
+**Live Data Simulation**
+
+A script samples from the features Parquet to simulate live traffic:
+- Generates `telemetry/live_data_dist.json`
+- Injects missing values to emulate real-world issues
+
+**Drift Metrics**
+
+For selected features, the system computes:
+- PSI (Population Stability Index)
+- Missing value ratio
+- Mean
+- Standard deviation
+
+Metrics are pushed to Prometheus via Pushgateway and visualized in Grafana.
 
 ## Test Coverage
 
-Unit Tests (`make test`)
+**Unit Tests** 
+
+Command:
+```bash
+make test
+```
 Covers:
 - Feature generators
 - Preprocessing helpers
@@ -62,34 +103,48 @@ Covers:
 - MLflow logging
 - Telemetry instrumentation
 
-Integration Tests (`make test-integration`)
-Runs inside Docker Compose against:
-- API container
-- Model artefacts
-- Example inference requests
+Target coverage: >80%
 
-Ensures:
-- API contract stability
-- Correct model loading
-- Valid prediction outputs
+**Integration Tests** 
 
-## Makefile Workflow
+Command:
+```bash
+make test-integration
+```
 
-Note: everything runs in the background.
+Runs inside Docker Compose and validates:
+- API startup
+- Model artifact loading
+- Prediction contract
+- End-to-end inference flow
 
-1. Run all unit tests
-   
-Note: make sure `requirements.txt` is also installed in your local machine (via virtual environment).
+## Local Development Workflow
+
+All services run in the background.
+
+
+1. Install Python dependencies locally (virtualenv recommended) via `requirements.txt`.
+
+2. Run unit tests
 ```bash
 make test
 ```
 
-2. Start full stack (MLflow, Spark, Airflow, API)
+3. Start full stack
 ```bash
 make up
 ```
 
-3. Trigger the Airflow training pipeline
+This builds the Docker image and starts:
+- Spark
+- MLflow
+- Airflow
+- Flask API
+- Prometheus
+- Pushgateway
+- Grafana
+
+4. Trigger the Airflow training pipeline
    
 Open Airflow UI (http://localhost:4242/dags) and trigger `bitcoin-heist-training`.
 
@@ -97,7 +152,7 @@ Training performs:
 - Parquet → preprocessing → feature engineering → model training 
 - MLflow logs experiment and model artifacts
 
-4. Once the training DAG has finished successfully, run:
+5. Once the training DAG has finished successfully, run:
 ```bash
 make drift
 ```
@@ -105,16 +160,16 @@ make drift
 This generates `telemetry/live_data_dist.json` by sampling from the features parquet.
 A PSI monitor then reads `data_dist.json` and `live_data_dist.json`, computes PSI + missing ratio + mean + std per tracked feature, and pushes metrics to Prometheus via Pushgateway.
 
-5. Run integration tests
+6. Run integration tests
 ```bash
 make test-integration
 ```
 
-6. Use the live API interface
+7. Use the live API interface
    
 Open http://localhost:5001/ and submit values to receive prediction.
 
-7. Check out Grafana dashboard 
+8. Check out Grafana dashboard 
 
 Grafana dashboard is persisted via a bind mount to `infra/grafana/data`, which contains Grafana’s internal SQLite database (`grafana.db`).
 
@@ -122,15 +177,22 @@ Open http://localhost:3000/ and login with default credentials (local developmen
 - **Username:** admin  
 - **Password:** admin
 
-8. Shutdown system
+9. Shutdown system
 ```bash
 make down
 ```
 
-9. (Optional) Track logging
+10. (Optional) Track logging
 ```bash
 make logs-app
 ```
+
+## Design Notes
+
+- PySpark is used only where distributed processing provides value; model training runs locally.
+- Parquet is used throughout for efficient columnar storage and schema enforcement.
+- Training and serving share the same feature and preprocessing code to avoid training-serving skew.
+- All components are containerized and orchestrated via Docker Compose.
 
 ## References
 

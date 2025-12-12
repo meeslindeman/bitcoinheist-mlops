@@ -1,5 +1,8 @@
 services:
   app:
+    # build:
+    #     context: ..
+    #     dockerfile: infra/build/Dockerfile
     image: bitcoinheist-app:latest
     command: flask --app src.app.main_api run --host 0.0.0.0 --port 5001
     depends_on:
@@ -17,7 +20,7 @@ services:
       - "5001:5001"
     restart: "always"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5001/health"]
+      test: apt-get update -y && apt-get install -y curl && curl --fail http://localhost:8080 || exit 1
       interval: 30s
       timeout: 5s
       retries: 5
@@ -105,7 +108,7 @@ services:
       - ./grafana/provisioning:/etc/grafana/provisioning
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:3000/login"]
-      interval: 30s
+      interval: 10s
       timeout: 5s
       retries: 5
 

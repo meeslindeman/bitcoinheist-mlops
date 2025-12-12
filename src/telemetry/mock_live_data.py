@@ -8,9 +8,6 @@ from configs.configs import PathsConfig, TelemetryConfig
 from src.utils.spark_utils import read_data
 
 
-logger = logging.getLogger(__name__)
-
-
 # note: generate mocked "live" telemetry data based on preprocessed data
 # note: I want to do this in the container instead of a static json file so we need to run a script
 def main():  
@@ -38,19 +35,19 @@ def main():
 
     # note: serialize to JSON
     records = []
-    now = datetime.now(UTC)
+    now = datetime.now(UTC).isoformat()
     for i in range(n_live):
         record = {"timestamp": now}
         for f in features:
             value = sampled.loc[i, f]
-            record[f] = value
+            record[f] = None if np.isnan(value) else value
         records.append(record)
 
     path = TelemetryConfig.telemetry_live_data_dist_path
     with open(path, "w") as f:
         json.dump(records, f, indent=2)
 
-    logger.info(f"[Telemetry] Wrote {len(records)} mocked live records to: {path}")
+    print(f"[Telemetry] Wrote {len(records)} mocked live records to: {path}")
 
 
 if __name__ == "__main__":
