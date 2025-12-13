@@ -10,19 +10,6 @@ The system is designed to be containerized, and runnable end-to-end on a single 
 
 The system requires the raw BitcoinHeist dataset (CSV format) from the [UCI Machine Learning Repository](https://archive.ics.uci.edu/dataset/526/bitcoinheistransomwareaddressdataset).
 
-Run the following commands to get the dataset:
-```bash
-wget -O data/bitcoinheist.zip https://archive.ics.uci.edu/static/public/526/bitcoinheistransomwareaddressdataset.zip
-
-unzip data/bitcoinheist.zip -d data
-
-rm ./data/bitcoinheist.zip
-```
-
-Make sure the file is now stored at `data/BitcoinHeistData.csv`. This file is consumed by the initialization step (`csv_to_parquet`) to produce the Parquet dataset used throughout preprocessing, feature engineering, and training.
-
-## Dataset Feature Notes
-
 Feature definitions are derived from the transaction graph structure around each Bitcoin address.
 
 | Feature | Definition | Usefullness |
@@ -88,14 +75,116 @@ For selected features, the system computes:
 
 Metrics are pushed to Prometheus via Pushgateway and visualized in Grafana.
 
-## Test Coverage
+## Running the App
 
-**Unit Tests** 
-
-Command:
+### 1. Clone this repository:
 ```bash
-make test
+git clone git@github.com:meeslindeman/bitcoinheist-mlops.git
+cd bitcoinheist-mlops
 ```
+
+### 2. Download the dataset:
+
+
+Run the following commands to get the dataset:
+
+```bash
+wget -O data/bitcoinheist.zip \
+  https://archive.ics.uci.edu/static/public/526/bitcoinheistransomwareaddressdataset.zip && \
+unzip data/bitcoinheist.zip -d data && \
+rm ./data/bitcoinheist.zip
+```
+
+> [!NOTE]
+> If you do not have `wget`, you might want to try `curl` instead:
+```bash
+curl -o data/bitcoinheist.zip \
+	https://archive.ics.uci.edu/static/public/526/bitcoinheistransomwareaddressdataset.zip && \
+unzip data/bitcoinheist.zip -d data && \
+rm ./data/bitcoinheist.zip
+```
+
+Make sure the file is now stored at `data/BitcoinHeistData.csv`. This file is consumed by the initialization step (`csv_to_parquet`) to produce the Parquet dataset used throughout preprocessing, feature engineering, and training.
+
+### 3. Build the Docker image for the App:
+```bash
+make build
+```
+
+### 4. Run the app and all other containers required for the app:
+
+```bash
+make up
+```
+
+This runs the following Docker containers in the background:
+- App
+- MLflow
+- Airflow
+- Prometheus
+- Alertmanager
+- Pushgateway
+- Grafana
+
+*Steps 1 - 3 are needed once, afterwards you can just start the app using `make up`.*
+
+### 5. Trigger the Airflow training pipeline
+
+Open Airflow UI (http://localhost:4242/dags) and trigger `bitcoin-heist-training`.
+
+Training performs:
+- Parquet → preprocessing → feature engineering → model training 
+- MLflow logs experiment and model artifacts
+
+Once the training DAG has finished successfully, run:
+```bash
+make drift
+```
+
+This generates `telemetry/live_data_dist.json` by sampling from the features parquet.
+A PSI monitor then reads `data_dist.json` and `live_data_dist.json`, computes PSI + missing ratio + mean + std per tracked feature, and pushes metrics to Prometheus via Pushgateway.
+
+### 6. Use the live interface
+   
+Open http://localhost:5001/ and submit values to receive prediction.
+
+This serves a UI that uses the App's API. To interact with the APi directly, you can use `curl`, e.g.:
+```bash
+curl \
+  -H "Content-Type: application/json" \
+  -d '{
+        "year": 2014,
+        "day": 150,
+        "length": 5,
+        "weight": 0.12,
+        "count": 3,
+        "looped": 1,
+        "neighbors": 15,
+        "income": 0.003
+      }' \
+  -X POST http://localhost:5001/predict
+```
+
+More request can be found in `./scripts/api_requests.sh`.
+
+### 7. Check out Grafana dashboard 
+
+Grafana dashboard is persisted via a bind mount to `infra/grafana/data`, which contains Grafana’s internal SQLite database (`grafana.db`).
+
+Open http://localhost:3000/ and login with default credentials (local development only):
+- **Username:** admin  
+- **Password:** admin
+
+### 8. (Optional) Track logging
+```bash
+make logs-app
+```
+
+### 9. (Optional) Run tests
+
+
+#### Unit test
+
 Covers:
 - Feature generators
 - Preprocessing helpers
@@ -105,12 +194,13 @@ Covers:
 
 Target coverage: >80%
 
-**Integration Tests** 
+Once your container with the app is available, you can run the unittest and view the coverage report:
 
-Command:
 ```bash
-make test-integration
+make test-unit
 ```
+
+#### Integration tests
 
 Runs inside Docker Compose and validates:
 - API startup
@@ -118,73 +208,14 @@ Runs inside Docker Compose and validates:
 - Prediction contract
 - End-to-end inference flow
 
-## Local Development Workflow
-
-All services run in the background.
-
-
-1. Install Python dependencies locally (virtualenv recommended) via `requirements.txt`.
-
-2. Run unit tests
-```bash
-make test
-```
-
-3. Start full stack
-```bash
-make up
-```
-
-This builds the Docker image and starts:
-- Spark
-- MLflow
-- Airflow
-- Flask API
-- Prometheus
-- Pushgateway
-- Grafana
-
-4. Trigger the Airflow training pipeline
-   
-Open Airflow UI (http://localhost:4242/dags) and trigger `bitcoin-heist-training`.
-
-Training performs:
-- Parquet → preprocessing → feature engineering → model training 
-- MLflow logs experiment and model artifacts
-
-5. Once the training DAG has finished successfully, run:
-```bash
-make drift
-```
-
-This generates `telemetry/live_data_dist.json` by sampling from the features parquet.
-A PSI monitor then reads `data_dist.json` and `live_data_dist.json`, computes PSI + missing ratio + mean + std per tracked feature, and pushes metrics to Prometheus via Pushgateway.
-
-6. Run integration tests
+Command:
 ```bash
 make test-integration
 ```
 
-7. Use the live API interface
-   
-Open http://localhost:5001/ and submit values to receive prediction.
-
-8. Check out Grafana dashboard 
-
-Grafana dashboard is persisted via a bind mount to `infra/grafana/data`, which contains Grafana’s internal SQLite database (`grafana.db`).
-
-Open http://localhost:3000/ and login with default credentials (local development only):
-- **Username:** admin  
-- **Password:** admin
-
-9. Shutdown system
+### 10. Shutdown system
 ```bash
 make down
-```
-
-10. (Optional) Track logging
-```bash
-make logs-app
 ```
 
 ## Design Notes

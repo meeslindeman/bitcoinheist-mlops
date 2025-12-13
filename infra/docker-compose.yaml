@@ -1,10 +1,9 @@
 services:
   app:
-    # build:
-    #     context: ..
-    #     dockerfile: infra/build/Dockerfile
+    build:
+      context: ..
+      dockerfile: infra/build/Dockerfile
     image: bitcoinheist-app:latest
-    command: flask --app src.app.main_api run --host 0.0.0.0 --port 5001
     depends_on:
       mlflow:
         condition: service_healthy
@@ -18,9 +17,9 @@ services:
         condition: service_healthy
     ports:
       - "5001:5001"
-    restart: "always"
+    restart: unless-stopped
     healthcheck:
-      test: apt-get update -y && apt-get install -y curl && curl --fail http://localhost:8080 || exit 1
+      test: curl --fail http://localhost:5001 || exit 1
       interval: 30s
       timeout: 5s
       retries: 5
