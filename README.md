@@ -35,7 +35,7 @@ The pipeline requires the raw BitcoinHeist dataset (CSV format) from the [UCI Ma
 - Creates ratios and derived features
 - Performs feature selection
 - Produces a features Parquet dataset and a JSON feature schema
-- 
+  
 #### 4. Model Training
 - Uses Scikit-learn RandomForest Classifier
 - Runs cross-validation and evaluation
