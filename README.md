@@ -80,7 +80,7 @@ Metrics are pushed to Prometheus via Pushgateway and visualized in Grafana.
 
 ### 1. Clone this repository
 ```bash
-git clone git@github.com:meeslindeman/bitcoinheist-mlops.git
+git clone https://github.com/meeslindeman/bitcoinheist-mlops.git
 cd bitcoinheist-mlops
 ```
 
