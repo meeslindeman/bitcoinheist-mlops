@@ -1,7 +1,6 @@
 # BitcoinHeist ML Pipeline (Course Project)
 
-This repository implements a production-style ML system for detecting ransomware-related Bitcoin addresses using the BitcoinHeist dataset.  
-The project covers the complete MLOps lifecycle: data ingestion, distributed preprocessing, feature engineering, model training, experiment tracking, API serving, telemetry, monitoring, and testing. The system is designed to be containerized, and runnable end-to-end on a single machine.
+This repository implements a production-style ML system for detecting ransomware-related Bitcoin addresses using the BitcoinHeist dataset. The project covers the complete MLOps lifecycle: data ingestion, distributed preprocessing, feature engineering, model training, experiment tracking, API serving, telemetry, monitoring, and testing. The system is designed to be containerized, and runnable end-to-end on a single machine.
 
 ---
 
