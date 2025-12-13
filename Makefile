@@ -1,9 +1,4 @@
-.PHONY: test build build-nocache up drift test-integration down clean enter-app logs-app 
-
-# note: unit tests and coverage for src/ only (local tests)
-test:
-	coverage run -m pytest -v tests/unit -p no:warnings .
-	coverage report --rcfile=.coveragerc
+.PHONY: test-integration test-unit build build-nocache up drift up down build-nocache restart clean logs-app enter-app	 
 
 build:
 	docker build . -t bitcoinheist-app -f infra/build/Dockerfile
@@ -12,20 +7,25 @@ build-nocache:
 	docker build --no-cache . -t bitcoinheist-app -f infra/build/Dockerfile
 
 # note: bring up full stack 
-up: build
+up:
+	docker compose -f infra/docker-compose.yaml up -d
+
+# note: bring down full stack 
+down:
 	docker compose -f infra/docker-compose.yaml down
-	docker compose -f infra/docker-compose.yaml up -d --build --remove-orphans
+
+restart:
+	docker compose -f infra/docker-compose.yaml restart
 
 drift:
 	docker compose --file infra/docker-compose.yaml exec app \
 		sh -c "python -m src.telemetry.mock_live_data && python -m src.telemetry.drift_calculation"
 
-# note: integration tests run inside the app container
-test-integration:
-	docker compose --file infra/docker-compose.yaml exec app pytest -v tests/integration -p no:warnings
+test-unit:
+	docker compose --file infra/docker-compose.yaml exec app sh -c 'coverage run -m pytest -v tests/unit -p no:warnings . && coverage report --rcfile=.coveragerc'
 
-down:
-	docker compose --file infra/docker-compose.yaml down
+test-integration:
+	docker compose --file infra/docker-compose.yaml exec app sh -c 'pytest -v tests/integration -p no:warnings'
 
 # note: usefull commands
 clean:
@@ -36,6 +36,4 @@ logs-app:
 
 enter-app:
 	docker compose --file infra/docker-compose.yaml exec app sh
-
-
 
